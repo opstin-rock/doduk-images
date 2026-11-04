@@ -79,14 +79,34 @@
   .tarot-result p { margin:0; font-size:14px; line-height:1.6; }
   .tarot-box .btns .go { background:var(--yellow); color:var(--ink); }
   .tarot-box .login { color:#9A8CC0; }
-</style></head>
-<body>
+  .snackbar { position:fixed; left:50%; top:88px; transform:translateX(-50%); background:rgba(43,38,34,.9); color:#fff; border-radius:14px; padding:7px 14px; font-size:13px; text-align:center; display:none; max-width:min(92vw, 440px); line-height:1.45; pointer-events:none; }
+  .snackbar.show { display:block; }
+  .snackbar b { font-family:"Jua",sans-serif; font-weight:400; color:var(--yellow); margin-right:6px; font-size:15px; }
+  .snackbar small { color:#ddd; font-size:12px; }
+  .chooser { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; padding:16px; }
+  .chooser.open { display:flex; }
+  .chooser .box { background:#fff; border-radius:20px; padding:20px 18px; width:min(100%, 340px); text-align:center; }
+  .chooser .ct { font-family:"Jua",sans-serif; font-size:24px; }
+  .chooser .cs { font-size:12px; color:var(--gray); margin:6px 0 14px; line-height:1.5; }
+  .chooser button { display:block; width:100%; border:0; border-radius:14px; padding:13px; margin-top:8px; font-family:"Jua",sans-serif; font-size:19px; background:var(--yellow); color:var(--ink); cursor:pointer; }
+  .chooser button.any { background:#f1f1f1; font-size:16px; }
+</style></head><body>
 <canvas id="game"></canvas>
 <div class="top">
   <div class="chip" id="me">들어가는 중</div>
   <div class="chip" id="count">지금 <b>1</b>마리 구경 중</div>
 </div>
 <button class="chip music" id="music">음악 끄기</button>
+<div class="snackbar" id="snackBar"></div>
+<div class="chooser" id="chooser">
+  <div class="box">
+    <div class="ct">누구로 들어갈래?</div>
+    <div class="cs">품종은 그 안에서 랜덤이야. 왼쪽 위 이름을 누르면 다시 고를 수 있어</div>
+    <button data-kind="dog">강아지</button>
+    <button data-kind="cat">고양이</button>
+    <button data-kind="" class="any">아무거나</button>
+  </div>
+</div>
 <div class="hint" id="hint">바닥을 누르면 걸어가 · 빨간 문은 타임딜</div>
 <button class="talk" id="talk">말풍선</button>
 <button class="talk act" id="act">행동</button>
@@ -140,9 +160,9 @@
   </div>
   <div class="login">폐쇄몰이라 구경은 그냥 되고, 구매할 때 로그인만 하면 돼</div>
 </div>
-<script src="config.js?v=22"></script>
+<script src="config.js?v=23"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="pets.js?v=22"></script>
-<script src="app.js?v=22"></script>
+<script src="pets.js?v=23"></script>
+<script src="app.js?v=23"></script>
 </body>
 </html>
