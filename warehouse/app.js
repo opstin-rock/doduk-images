@@ -77,8 +77,11 @@ function onPeer(p) {
   if (p.id === myId) return;
   if (p.scene !== me.scene) { peers.delete(p.id); return; }
   const cur = peers.get(p.id);
-  if (cur) Object.assign(cur, { breed: p.breed, tx: p.tx, ty: p.ty, seen: Date.now(), goneAt: 0 });
-  else peers.set(p.id, { breed: p.breed, x: p.x, y: p.y, tx: p.tx, ty: p.ty, seen: Date.now() });
+  // 예전 정보가 늦게 도착해도 되돌아가지 않게, 더 새 정보(ts)만 반영
+  if (cur && p.ts && cur.ts && p.ts <= cur.ts) { cur.goneAt = 0; cur.seen = Date.now(); return; }
+  if (cur) Object.assign(cur, { breed: p.breed, tx: p.tx, ty: p.ty, ts: p.ts, seen: Date.now(), goneAt: 0 });
+  // 처음 보는 손님은 가려던 자리(tx, ty)에 바로 세움 (출발점으로 순간이동했다가 다시 걷는 일 없게)
+  else peers.set(p.id, { breed: p.breed, x: p.tx, y: p.ty, tx: p.tx, ty: p.ty, ts: p.ts, seen: Date.now() });
 }
 
 // ---------- 말풍선: 정해진 문구만 (자유 입력 없음). 번호만 주고받아서 다른 글이 끼어들 수 없음 ----------
@@ -97,7 +100,8 @@ function onSay(id, i) {
 
 const net = (() => {
   const cfg = window.DODUK || {};
-  const payload = () => ({ id: me.id, breed: me.breed, scene: me.scene, x: Math.round(me.x), y: Math.round(me.y), tx: Math.round(me.tx), ty: Math.round(me.ty) });
+  let seq = 0;   // 보낼 때마다 1씩 늘어나는 번호 (어느 정보가 최신인지 구분)
+  const payload = () => ({ id: me.id, breed: me.breed, scene: me.scene, x: Math.round(me.x), y: Math.round(me.y), tx: Math.round(me.tx), ty: Math.round(me.ty), ts: Date.now() * 100 + (seq++ % 100) });
   if (cfg.supabaseUrl && cfg.supabaseKey && window.supabase) {
     // Supabase Realtime presence: 방마다 채널을 따로 열어 그 방 접속자끼리 위치 공유
     // worker: 화면이 뒤로 가도 연결 유지 신호(heartbeat)가 밀리지 않게 별도 작업자에서 보냄
@@ -112,7 +116,8 @@ const net = (() => {
       ch.on('presence', { event: 'sync' }, () => {
         const state = ch.presenceState();
         const ids = new Set(Object.keys(state));
-        for (const metas of Object.values(state)) onPeer(metas[metas.length - 1]);
+        // 같은 손님이 재접속 중이면 정보가 2개 겹칠 수 있음 → 가장 최신 것만 사용
+        for (const metas of Object.values(state)) onPeer(metas.reduce((a, b) => ((b.ts ?? 0) > (a.ts ?? 0) ? b : a)));
         // 목록에서 빠진 손님은 바로 지우지 않고 8초 기다림 (잠깐 끊겼다 붙는 경우 깜빡임 방지)
         for (const [id, p] of peers) if (!ids.has(id) && !p.goneAt) p.goneAt = Date.now();
       });
