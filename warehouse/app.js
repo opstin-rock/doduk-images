@@ -72,7 +72,7 @@ function sceneInfo() {
   if (isPlaza()) return { title: '도둑냥 광장', items: [], shelves: [] };
   if (!data) return { title: '', items: [], shelves: ROOM_SHELVES };
   if (me.scene === 'field') return { title: '운동장', items: [], shelves: [], field: true };
-  if (me.scene === 'treasure') return { title: '보물창고', items: [], shelves: [], treasure: true };
+  if (me.scene === 'dance') return { title: '댄스장', items: [], shelves: [], dance: true };
   if (me.scene === 'photo') return { title: '포토존', items: [], shelves: [], photo: true };
   if (me.scene === 'deal') { const items = data.hall.items.slice(0, DEAL_SHELVES.length); return { title: '오늘의 타임딜', items, shelves: DEAL_SHELVES.slice(0, Math.max(1, items.length)), deal: true }; }
   const room = data.rooms.find((r) => r.id === me.scene);
@@ -83,7 +83,7 @@ function doors() {
   const list = [{ id: 'deal', title: '오늘의 타임딜', x: DEAL_DOOR.x, y: DEAL_DOOR.y, side: 'top' }];
   // 강아지·고양이 카테고리 방 문은 2026-11-04에 뺌 (광장은 노는 곳 + 타임딜 방 + 포토존)
   list.push({ id: 'photo', title: '도둑냥 포토존', side: 'left', x: 30, y: 900 });
-  list.push({ id: 'treasure', title: '도둑냥 보물창고', side: 'right', x: PLAZA.w - 30, y: 900 });
+  list.push({ id: 'dance', title: '도둑냥 댄스장', side: 'right', x: PLAZA.w - 30, y: 900 });
   list.push({ id: 'field', title: '도둑냥 운동장', side: 'right', x: PLAZA.w - 30, y: 480 });
   return list;
 }
@@ -471,7 +471,7 @@ function drawBooth(t) {
   rr(c.x - 80, c.y - 28, 160, 52, 10); ctx.fillStyle = '#6B4A30'; ctx.fill();
   rr(c.x - 80, c.y - 28, 160, 14, 10); ctx.fillStyle = '#8A6343'; ctx.fill();
   if (!bot.home || (bot.say && Date.now() < bot.say.until)) return;   // 도둑냥이 청소하러 나가면 부스는 비어 있음
-  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 소품 쓰고 네컷 찍어 가', '오른쪽 문은 보물창고, 내가 숨겨둔 거 찾아봐', '오른쪽 위 문은 운동장, 공 차러 가자', '오른쪽 아래 천막은 점집, 오늘의 카드 뽑아 봐', '구경은 공짜, 살 때만 로그인'];
+  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 소품 쓰고 네컷 찍어 가', '오른쪽 문은 댄스장, 들어가면 다 같이 춤춰', '오른쪽 위 문은 운동장, 공 차러 가자', '오른쪽 아래 천막은 점집, 오늘의 카드 뽑아 봐', '구경은 공짜, 살 때만 로그인'];
   const msg = lines[Math.floor(t / 4) % lines.length];
   ctx.font = '18px Jua'; const w = ctx.measureText(msg).width + 24;
   const bx = c.x + 30, by = c.y - 172;
@@ -503,6 +503,11 @@ function drawActor(p, t, mine) {
   if (a === 'roll') { ctx.translate(p.x, p.y - 30); ctx.rotate(Math.min(1, k) * Math.PI * 2 * (p.face ?? 1)); ctx.translate(-p.x, -(p.y - 30)); }
   if (a === 'sleep') { ctx.translate(p.x, p.y); ctx.scale(1, 0.8); ctx.translate(-p.x, -p.y); }
   if (a === 'wag') ctx.translate(0, Math.abs(Math.sin(t * 16)) * -3);
+  if (!a && isDance() && Math.hypot(p.tx - p.x, p.ty - p.y) < 2) {
+    const b = beatAt(t) + (p.breed % 4) * 0.25;
+    ctx.translate(0, -Math.abs(Math.sin(b * Math.PI)) * 12);
+    p.face = Math.floor(b / 2) % 2 ? -1 : 1;
+  }
   const top = drawPet(ctx, q, t, mine);
   ctx.restore();
   // 효과
@@ -624,83 +629,47 @@ function drawGoalBanner() {
   ctx.restore();
 }
 
-// ---------- 보물창고: 상자 12개 중 3개에 도둑냥이 오늘의 타임딜을 숨겨둠 ----------
-// 하루(한국 시간) 단위로 숨긴 자리가 바뀌고, 모두에게 같은 자리. 연 상자는 이 브라우저에 오늘 하루 기억
-const BOXES = [360, 540, 720, 900].flatMap((y, r) => [150, 360, 570].map((x, j) => ({ x: x + [[-10, 20, 5], [15, -15, 0], [0, 10, -20], [-15, 5, 15]][r][j], y: y + (j === 1 ? 25 : 0) })));
-const HIDDEN = 3;
-const GAGS = ['꽝, 먼지만 있어', '양말 한 짝', '털뭉치', '빈 간식 봉지', '도둑냥 낮잠 자리였어', '뽁뽁이', '꽝, 다음 상자', '고무줄 하나', '털 엄청 묻었어', '여긴 비었어'];
+// 한국 시간 기준 날짜 번호 (점집 등 하루 단위 기능에 씀)
 const dayKey = () => Math.floor((Date.now() + 9 * 3600000) / 86400000);
-function treasureMap() {
-  const day = dayKey();
-  const rnd = seeded(day * 7919);
-  const order = BOXES.map((_, i) => i);
-  for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
-  const pool = (data?.hall.items || []).slice();
-  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
-  const map = {};
-  order.slice(0, Math.min(HIDDEN, pool.length)).forEach((bi, n) => { map[bi] = pool[n]; });
-  return { day, map, gag: (i) => GAGS[(i * 7 + day) % GAGS.length] };
-}
-const openedKey = () => `doduk-boxes-${dayKey()}`;
-let opened = new Set(), openedDay = 0;
-function loadOpened() {
-  openedDay = dayKey();
-  try { opened = new Set(JSON.parse(localStorage.getItem(openedKey()) || '[]')); } catch { opened = new Set(); }
-}
-function saveOpened() { try { localStorage.setItem(openedKey(), JSON.stringify([...opened])); } catch {} }
-loadOpened();
-const boxAnim = {};
-let treasureBox = -1;
-function foundCount() { const { map } = treasureMap(); return [...opened].filter((i) => map[i]).length; }
-function openBox(i) {
-  const { map, gag } = treasureMap();
-  opened.add(i); saveOpened(); boxAnim[i] = performance.now();
-  const item = map[i];
-  if (!item) { speech.set('box' + i, { text: gag(i), until: Date.now() + 2500 }); return; }
-  const n = foundCount();
-  speech.set(myId, { text: n >= Object.keys(map).length ? '다 찾았다' : '찾았다', until: Date.now() + 2500 });
-  treasureBox = i;
-  setTimeout(() => {
-    if (me.scene !== 'treasure' || treasureBox !== i) return;
-    openCard(-2, item);
-    document.getElementById('sSpec').textContent = `도둑냥 보물창고에서 찾음 · 오늘 ${n}/${Object.keys(map).length}`;
-  }, 700);
-}
-function drawBox(b, i, t, now) {
-  const { map } = treasureMap();
-  const isOpen = opened.has(i), item = isOpen && map[i];
-  const k = isOpen ? Math.min(1, (now - (boxAnim[i] ?? -1e9)) / 300) : 0;
-  ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(b.x, b.y + 2, 56, 12, 0, 0, Math.PI * 2); ctx.fill();
-  if (item) {   // 보물: 금빛 + 물건이 튀어나옴
-    const glow = 0.35 + Math.sin(t * 4) * 0.15;
-    ctx.fillStyle = `rgba(255,213,74,${glow})`; ctx.beginPath(); ctx.arc(b.x, b.y - 70 - 60 * k, 70, 0, Math.PI * 2); ctx.fill();
-    const im = img(item.img), s = 64, rise = 100 * k;
-    if (im && im.complete && im.naturalWidth) {
-      rr(b.x - s / 2 - 4, b.y - 76 - s - rise + 30, s + 8, s + 8, 10); ctx.fillStyle = '#fff'; ctx.fill();
-      const q = Math.min(s / im.naturalWidth, s / im.naturalHeight);
-      ctx.drawImage(im, b.x - (im.naturalWidth * q) / 2, b.y - 72 - rise + 30 - s / 2 - (im.naturalHeight * q) / 2, im.naturalWidth * q, im.naturalHeight * q);
-    }
+
+// ---------- 댄스장: 들어오면 모두 박자에 맞춰 들썩임 (주민 댄서도 있음) ----------
+const BPM = 120;
+const beatAt = (t) => (t * BPM) / 60;
+const isDance = () => me.scene === 'dance';
+function drawDance(t) {
+  const { w, h } = ROOM, b = beatAt(t), bi = Math.floor(b);
+  drawWallAndFloor(w, h, '#1E1A2E', '댄스장', '들어오면 다 같이 춤춰 · 행동 버튼도 돼');
+  // 반짝이는 바닥 타일
+  const cols = ['#E8402F', '#FFD54A', '#7B9E6B', '#8FC9E8', '#C57B88', '#9B7BE0'];
+  const S = 90;
+  for (let y = 230, j = 0; y < h - 70; y += S, j++) for (let x = 0, i = 0; x < w; x += S, i++) {
+    const on = (i + j + bi) % 3 === 0;
+    ctx.fillStyle = on ? cols[(i * 3 + j + bi) % cols.length] : '#2A2440';
+    ctx.globalAlpha = on ? 0.55 + 0.25 * (1 - (b % 1)) : 1;
+    ctx.fillRect(x + 3, y + 3, S - 6, S - 6);
   }
-  rr(b.x - 48, b.y - 70, 96, 70, 6); ctx.fillStyle = '#C9965F'; ctx.fill(); ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3; ctx.stroke();
-  ctx.fillStyle = '#E3C48F'; ctx.fillRect(b.x - 8, b.y - 69, 16, 68);
-  if (isOpen) {
-    rr(b.x - 44, b.y - 76, 88, 12, 4); ctx.fillStyle = '#5a3d22'; ctx.fill();
-    for (const side of [-1, 1]) {   // 뚜껑 날개가 바깥으로 젖혀짐
-      ctx.save(); ctx.translate(b.x + side * 48, b.y - 70); ctx.rotate(side * (0.2 + k * 0.9));
-      rr(side > 0 ? 0 : -40, -12, 40, 14, 4); ctx.fillStyle = '#B88550'; ctx.fill(); ctx.stroke(); ctx.restore();
-    }
-  } else {
-    rr(b.x - 52, b.y - 82, 104, 16, 5); ctx.fillStyle = '#B88550'; ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#7a5230'; ctx.font = '30px Jua'; ctx.textAlign = 'center'; ctx.fillText('?', b.x, b.y - 24 + Math.sin(t * 3 + i) * 2);
+  ctx.globalAlpha = 1;
+  // 미러볼과 빛 조각
+  ctx.strokeStyle = '#888'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(w / 2, 190); ctx.lineTo(w / 2, 214); ctx.stroke();
+  ctx.save(); ctx.beginPath(); ctx.arc(w / 2, 250, 38, 0, Math.PI * 2); ctx.fillStyle = '#C9CCD6'; ctx.fill(); ctx.clip();
+  for (let i = -4; i <= 4; i++) for (let j = -4; j <= 4; j++) { ctx.fillStyle = (i + j + bi) % 2 ? '#F4F6FA' : '#9EA3B0'; ctx.fillRect(w / 2 + i * 10 - ((t * 20) % 10), 250 + j * 10, 9, 9); }
+  ctx.restore();
+  ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(w / 2, 250, 38, 0, Math.PI * 2); ctx.stroke();
+  for (let i = 0; i < 14; i++) {
+    const a = i * 2.4 + t * 0.6, r = 160 + (i % 5) * 80;
+    ctx.fillStyle = `rgba(255,255,255,${0.18 + 0.12 * Math.sin(t * 3 + i)})`;
+    ctx.beginPath(); ctx.ellipse(w / 2 + Math.cos(a) * r, 700 + Math.sin(a) * r * 0.55, 9, 5, 0, 0, Math.PI * 2); ctx.fill();
   }
-}
-function drawTreasureRoom() {
-  const total = Object.keys(treasureMap().map).length;
-  drawWallAndFloor(ROOM.w, ROOM.h, '#E6DCCB', '보물창고', `오늘 숨긴 보물 ${total}개 · 찾은 것 ${foundCount()}개 · 상자 앞에 서면 열려`);
+  // 스피커
+  for (const x of [40, w - 40]) {
+    const pump = 1 + 0.06 * Math.max(0, 1 - (b % 1) * 3);
+    rr(x - 34, 300, 68, 120, 8); ctx.fillStyle = '#2B2622'; ctx.fill(); ctx.strokeStyle = '#111'; ctx.stroke();
+    ctx.fillStyle = '#555'; ctx.beginPath(); ctx.arc(x, 335, 18 * pump, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, 385, 24 * pump, 0, Math.PI * 2); ctx.fill();
+  }
   rr(EXIT.x - 85, ROOM.h - 46, 170, 36, 10); ctx.fillStyle = '#2B2622'; ctx.fill();
   ctx.fillStyle = '#FFD54A'; ctx.font = '19px Jua'; ctx.textAlign = 'center'; ctx.fillText('광장으로 나가기', EXIT.x, ROOM.h - 21);
 }
-
 // ---------- 포토존 ----------
 const inSpot = (p) => p.x > SPOT.x && p.x < SPOT.x + SPOT.w && p.y > SPOT.y && p.y < SPOT.y + SPOT.h;
 let flashUntil = 0;
@@ -1196,13 +1165,14 @@ const NPC_ACTS = ['bark', 'jump', 'heart', 'wag', 'roll', 'zoom'];
 const rndIn = (a, b) => a + Math.random() * (b - a);
 function spawnNpcs() {
   npcs.clear();
-  if (NPC_OFF || !isPlaza()) return;
+  if (NPC_OFF || !(isPlaza() || isDance())) return;
+  const dance = isDance();
   const used = new Set([me.breed]);
-  for (let i = 0; i < NPC_MAX; i++) {
+  for (let i = 0; i < (dance ? 5 : NPC_MAX); i++) {
     let breed; do { breed = Math.floor(Math.random() * BREEDS.length); } while (used.has(breed) && used.size < BREEDS.length);
     used.add(breed);
     const acc = Math.random() < 0.35 ? ACCESSORIES[1 + Math.floor(Math.random() * (ACCESSORIES.length - 1))].id : '';
-    const x = rndIn(380, 1060), y = rndIn(780, 1640);   // 처음 들어왔을 때 보이게 입구·가운데 쪽에 모아서 시작
+    const x = dance ? rndIn(120, 600) : rndIn(380, 1060), y = dance ? rndIn(380, 1000) : rndIn(780, 1640);   // 광장은 처음 들어왔을 때 보이게 입구·가운데 쪽에 모아서 시작
     npcs.set(`npc${i}`, { npc: true, breed, acc, x, y, tx: x, ty: y, next: performance.now() + rndIn(500, 4000) });
   }
 }
@@ -1212,6 +1182,13 @@ function activeNpcs() {
 }
 function npcThink(id, p, now) {
   p.next = now + rndIn(2500, 7000);
+  if (isDance()) {   // 댄스장 주민은 제자리 근처에서 춤추다 가끔 행동
+    const r = Math.random();
+    if (r < 0.25) { p.tx = Math.max(100, Math.min(620, p.x + rndIn(-120, 120))); p.ty = Math.max(360, Math.min(1040, p.y + rndIn(-80, 80))); }
+    else if (r < 0.6) onAct(id, ['jump', 'roll', 'wag', 'heart', 'zoom'][Math.floor(Math.random() * 5)], p.x, p.y);
+    else if (r < 0.7) speech.set(id, { text: phraseText([0, 4][Math.floor(Math.random() * 2)], p.breed), until: Date.now() + 2000 });
+    return;
+  }
   if (p.act && p.act.a === 'sleep') { if (Math.random() < 0.5) return; p.act = null; }
   const r = Math.random();
   if (r < 0.42) { p.tx = Math.max(140, Math.min(1300, p.x + rndIn(-320, 320))); p.ty = Math.max(320, Math.min(1640, p.y + rndIn(-260, 260))); }
@@ -1265,7 +1242,8 @@ function frame(now) {
     step(p, dt);
   }
   checkDoors();
-  if (isPlaza()) { stepBot(dt, now); stepNpcs(dt, now); }
+  if (isPlaza()) stepBot(dt, now);
+  if (isPlaza() || isDance()) stepNpcs(dt, now);
   if (me.scene === 'field') { stepBall(dt); kickCheck(); }
 
   const info = sceneInfo();
@@ -1275,13 +1253,12 @@ function frame(now) {
   if (info.photo && (boothEl.classList.contains('open') || countdown)) camY = SPOT.y + SPOT.h / 2 - viewH * 0.27;   // 꾸미는 동안 패널에 가리지 않게 발자국 자리를 위로
   ctx.setTransform(scale, 0, 0, scale, -camX * scale, -camY * scale);
   ctx.clearRect(camX, camY, VIEW_W, viewH);
-  if (isPlaza()) drawPlaza(t); else if (info.photo) drawPhotoRoom(t); else if (info.treasure) drawTreasureRoom(); else if (info.field) drawField(); else drawRoom(info);
+  if (isPlaza()) drawPlaza(t); else if (info.photo) drawPhotoRoom(t); else if (info.dance) drawDance(t); else if (info.field) drawField(); else drawRoom(info);
 
   // 위쪽(y가 작은 것)부터 그려서 앞뒤가 자연스럽게 겹치게
   const tops = [];   // 말풍선을 맨 위에 그리려고 캐릭터 머리 위치를 모아 둠
   const items = info.shelves.map((s, i) => ({ y: s.y + 60, draw: () => drawShelf(s, info.items[i]) }));
   if (info.field) items.push({ y: ball.y, draw: drawBall });
-  if (info.treasure) BOXES.forEach((b, i) => { items.push({ y: b.y, draw: () => drawBox(b, i, t, now) }); tops.push(['box' + i, b.x, b.y - 96]); });
   if (isPlaza() && !LINEUP) {
     items.push({ y: BOOTH.y + 24, draw: () => drawBooth(t) });
     items.push({ y: TENT.y, draw: () => drawTent(t) });
@@ -1290,7 +1267,7 @@ function frame(now) {
   for (let i = poops.length - 1; i >= 0; i--) if (Date.now() > poops[i].until) poops.splice(i, 1);
   for (const pp of poops) if (pp.scene === me.scene) items.push({ y: pp.y - 1, draw: () => drawPoop(pp, t) });
   for (const [id, p] of peers) items.push({ y: p.y, draw: () => tops.push([id, p.x, drawActor(p, t, false)]) });
-  if (isPlaza()) for (const [id, p] of activeNpcs()) items.push({ y: p.y, draw: () => tops.push([id, p.x, drawActor(p, t, false)]) });
+  if (isPlaza() || isDance()) for (const [id, p] of activeNpcs()) items.push({ y: p.y, draw: () => tops.push([id, p.x, drawActor(p, t, false)]) });
   items.push({ y: me.y, draw: () => tops.push([myId, me.x, drawActor(me, t, true)]) });
   items.sort((a, b) => a.y - b.y).forEach((it) => it.draw());
   for (const [id, x, top] of tops) {
@@ -1323,13 +1300,6 @@ function frame(now) {
   if (canTarot !== tarotBtn.classList.contains('show')) tarotBtn.classList.toggle('show', canTarot);
   if (!isPlaza() && tarotEl.classList.contains('open')) tarotEl.classList.remove('open');
 
-  if (info.treasure) {
-    if (openedDay !== dayKey()) loadOpened();   // 자정 지나면 새 상자
-    const stillHere = Math.hypot(me.tx - me.x, me.ty - me.y) < 2;
-    const bi = BOXES.findIndex((b) => Math.abs(me.x - b.x) < 60 && me.y > b.y - 10 && me.y < b.y + 60);
-    if (stillHere && bi >= 0 && !opened.has(bi)) openBox(bi);
-    if (openShelf === -2 && bi !== treasureBox) { sheet.classList.remove('open'); openShelf = -1; treasureBox = -1; }
-  }
   const n = nearShelf(info.shelves);
   const still = Math.hypot(me.tx - me.x, me.ty - me.y) < 2;
   if (n >= 0 && n !== openShelf && n !== dismissed && still && info.items[n]) openCard(n, info.items[n]);
