@@ -38,7 +38,8 @@ resize();
 
 // ---------- 나 ----------
 const myId = Math.random().toString(36).slice(2, 10);
-const me = { id: myId, breed: Math.floor(Math.random() * BREEDS.length), scene: 'hall', x: ENTRY.x, y: ENTRY.y, tx: ENTRY.x, ty: ENTRY.y };   // 들어오면 입구에 서 있음
+const me = { id: myId, breed: Math.floor(Math.random() * BREEDS.length), scene: 'hall', x: ENTRY.x, y: ENTRY.y, tx: ENTRY.x, ty: ENTRY.y, acc: '' };
+try { me.acc = localStorage.getItem('doduk-acc') || ''; } catch {}   // 포토존에서 고른 소품은 다음에 와도 유지   // 들어오면 입구에 서 있음
 document.getElementById('me').textContent = `나: ${BREEDS[me.breed].name}`;
 const isPlaza = () => me.scene === 'hall';
 const size = () => (isPlaza() ? PLAZA : ROOM);
@@ -93,8 +94,8 @@ function onPeer(p) {
   if (p.id === myId) return;
   if (p.scene !== me.scene) { peers.delete(p.id); return; }
   const cur = peers.get(p.id);
-  if (cur) { cur.breed = p.breed; cur.seen = Date.now(); cur.goneAt = 0; return; }   // 이동은 Broadcast가 맡음
-  peers.set(p.id, { breed: p.breed, x: p.tx, y: p.ty, tx: p.tx, ty: p.ty, seq: 0, seen: Date.now(), goneAt: 0 });
+  if (cur) { cur.breed = p.breed; cur.acc = p.acc; cur.seen = Date.now(); cur.goneAt = 0; return; }   // 이동은 Broadcast가 맡음
+  peers.set(p.id, { breed: p.breed, acc: p.acc, x: p.tx, y: p.ty, tx: p.tx, ty: p.ty, seq: 0, seen: Date.now(), goneAt: 0 });
   greetNewcomer();
 
 }
@@ -110,7 +111,7 @@ function onMove(m) {
   if (!cur) { cur = { breed: m.breed, x: m.sx, y: m.sy, seq: 0 }; peers.set(m.id, cur); greetNewcomer(); }
   if (m.seq <= cur.seq) return;   // 늦게 도착한 예전 이동은 무시
   if (Math.hypot(cur.x - m.sx, cur.y - m.sy) > 50) { cur.x = m.sx; cur.y = m.sy; }
-  Object.assign(cur, { breed: m.breed, tx: m.tx, ty: m.ty, seq: m.seq, seen: Date.now(), goneAt: 0 });
+  Object.assign(cur, { breed: m.breed, acc: m.acc ?? cur.acc, tx: m.tx, ty: m.ty, seq: m.seq, seen: Date.now(), goneAt: 0 });
   if (cur.act && cur.act.a === 'sleep') cur.act = null;   // 움직이면 잠에서 깸
 }
 
@@ -158,8 +159,8 @@ function onAct(id, a, x, y) {
 const net = (() => {
   const cfg = window.DODUK || {};
   let seq = 0;
-  const presence = () => ({ id: me.id, breed: me.breed, scene: me.scene, tx: Math.round(me.tx), ty: Math.round(me.ty), ts: Date.now() });
-  const move = () => ({ id: me.id, breed: me.breed, scene: me.scene, sx: Math.round(me.x), sy: Math.round(me.y), tx: Math.round(me.tx), ty: Math.round(me.ty), seq: ++seq });
+  const presence = () => ({ id: me.id, breed: me.breed, acc: me.acc, scene: me.scene, tx: Math.round(me.tx), ty: Math.round(me.ty), ts: Date.now() });
+  const move = () => ({ id: me.id, breed: me.breed, acc: me.acc, scene: me.scene, sx: Math.round(me.x), sy: Math.round(me.y), tx: Math.round(me.tx), ty: Math.round(me.ty), seq: ++seq });
   if (cfg.supabaseUrl && cfg.supabaseKey && window.supabase) {
     // worker: 화면이 뒤로 가도 연결 유지 신호(heartbeat)가 밀리지 않게 별도 작업자에서 보냄
     const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, { realtime: { worker: true } });
@@ -466,7 +467,7 @@ function drawBooth(t) {
   rr(c.x - 80, c.y - 28, 160, 52, 10); ctx.fillStyle = '#6B4A30'; ctx.fill();
   rr(c.x - 80, c.y - 28, 160, 14, 10); ctx.fillStyle = '#8A6343'; ctx.fill();
   if (!bot.home || (bot.say && Date.now() < bot.say.until)) return;   // 도둑냥이 청소하러 나가면 부스는 비어 있음
-  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 사진 찍어 가', '오른쪽 문은 보물창고, 내가 숨겨둔 거 찾아봐', '오른쪽 위 문은 운동장, 공 차러 가자', '구경은 공짜, 살 때만 로그인'];
+  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 소품 쓰고 네컷 찍어 가', '오른쪽 문은 보물창고, 내가 숨겨둔 거 찾아봐', '오른쪽 위 문은 운동장, 공 차러 가자', '구경은 공짜, 살 때만 로그인'];
   const msg = lines[Math.floor(t / 4) % lines.length];
   ctx.font = '18px Jua'; const w = ctx.measureText(msg).width + 24;
   const bx = c.x + 30, by = c.y - 172;
@@ -696,7 +697,8 @@ function drawTreasureRoom() {
   ctx.fillStyle = '#FFD54A'; ctx.font = '19px Jua'; ctx.textAlign = 'center'; ctx.fillText('광장으로 나가기', EXIT.x, ROOM.h - 21);
 }
 
-// ---------- 포토존 ----------const inSpot = (p) => p.x > SPOT.x && p.x < SPOT.x + SPOT.w && p.y > SPOT.y && p.y < SPOT.y + SPOT.h;
+// ---------- 포토존 ----------
+const inSpot = (p) => p.x > SPOT.x && p.x < SPOT.x + SPOT.w && p.y > SPOT.y && p.y < SPOT.y + SPOT.h;
 let flashUntil = 0;
 function bunting(g, x0, x1, y, size) {
   const cols = ['#E8402F', '#FFD54A', '#7B9E6B', '#8FC9E8', '#C57B88'];
@@ -715,7 +717,7 @@ function paw(g, x, y, r, col) {
   for (const [dx, dy] of [[-0.9, -1.1], [-0.3, -1.5], [0.3, -1.5], [0.9, -1.1]]) { g.beginPath(); g.arc(x + dx * r, y + dy * r, r * 0.32, 0, Math.PI * 2); g.fill(); }
 }
 function drawPhotoRoom(t) {
-  drawWallAndFloor(ROOM.w, ROOM.h, '#EFE4D4', '포토존', '발자국 위에 서서 찍어봐');
+  drawWallAndFloor(ROOM.w, ROOM.h, '#EFE4D4', '포토존', '발자국 위에 서서 소품 고르고 네컷 찍어봐');
   rr(50, 220, 620, 440, 26); ctx.fillStyle = '#F3E3C2'; ctx.fill(); ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 4; ctx.stroke();
   bunting(ctx, 70, 650, 240, 34);
   ctx.textAlign = 'center'; ctx.fillStyle = '#2B2622'; ctx.font = '58px Jua'; ctx.fillText('도둑냥 광장', 360, 410);
@@ -737,70 +739,200 @@ function drawPhotoRoom(t) {
   ctx.fillStyle = '#FFD54A'; ctx.font = '19px Jua'; ctx.textAlign = 'center'; ctx.fillText('광장으로 나가기', EXIT.x, ROOM.h - 21);
 }
 
-// 사진 카드 (인스타 세로 비율 1080x1350): 발자국 자리에 선 친구들까지 같이 찍힘
-function makeCard() {
-  const CW = 1080, CH = 1350, c = document.createElement('canvas');
-  c.width = CW; c.height = CH;
+// ---------- 스티커사진 부스: 소품·배경·컷 고르고 찍기 ----------
+// 4컷은 3·2·1 세고 4번 찍음. 찍는 사이에 자리 바꾸거나 행동 버튼 누르면 그대로 사진에 남음
+const THEMES = [
+  { id: 'cream', name: '크림', bg: '#FBF6EC', frame: '#F3E3C2', floor: '#E9DCC4', band: '#2B2622', accent: '#FFD54A', ink: '#1f1f22', sub: '#8a8a8a' },
+  { id: 'pink', name: '핑크', bg: '#FFE8EE', frame: '#FFD3DE', floor: '#F9BCCB', band: '#C2456A', accent: '#FFF2B3', ink: '#5a1f33', sub: '#a0607a' },
+  { id: 'sky', name: '하늘', bg: '#E6F4FF', frame: '#CDE8FB', floor: '#AED5F2', band: '#2F5F8A', accent: '#FFD54A', ink: '#1d3a57', sub: '#5f7f9c' },
+  { id: 'mint', name: '민트', bg: '#E7F7EF', frame: '#CDEFDD', floor: '#A9DDC2', band: '#2E6B52', accent: '#FFE07A', ink: '#1f4a39', sub: '#5f8a77' },
+  { id: 'night', name: '밤', bg: '#1E2233', frame: '#2C3350', floor: '#3A4366', band: '#0F1220', accent: '#FFD54A', ink: '#ffffff', sub: '#aab2cc' },
+];
+const booth = { theme: 'cream', cuts: 4, busy: false };
+try { booth.theme = localStorage.getItem('doduk-theme') || 'cream'; } catch {}
+let countdown = null;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// 찍는 순간 발자국 자리에 있던 손님들 모습 (최대 6마리, 나는 자리를 벗어나도 포함)
+function capture() {
+  const now = performance.now();
+  return [me, ...[...peers.values()].filter(inSpot)].slice(0, 6).map((p) => ({
+    breed: p.breed, x: p.x, y: p.y, face: p.face ?? 1, acc: p.acc || '', mine: p === me,
+    a: p.act ? p.act.a : null, k: p.act ? Math.min(1, (now - p.act.start) / p.act.dur) : 0,
+  })).sort((a, b) => a.y - b.y);
+}
+function heart(g, x, y, s, col) {
+  g.fillStyle = col; g.beginPath(); g.moveTo(x, y + s);
+  g.bezierCurveTo(x - s * 2, y - s * 0.6, x - s, y - s * 2.2, x, y - s * 1);
+  g.bezierCurveTo(x + s, y - s * 2.2, x + s * 2, y - s * 0.6, x, y + s); g.fill();
+}
+function drawSnapPet(g, p, x, y, k) {
+  g.save(); g.translate(x, y); g.scale(k, k);
+  const dy = p.a === 'jump' ? -Math.sin(p.k * Math.PI) * 55 : 0;
+  if (p.a === 'roll') { g.translate(0, -30); g.rotate(p.k * Math.PI * 2 * p.face); g.translate(0, 30); }
+  if (p.a === 'sleep' || p.a === 'poop') g.scale(1, 0.82);
+  const top = drawPet(g, { breed: p.breed, x: 0, y: dy, tx: 0, ty: dy, face: p.face, acc: p.acc, noTag: true }, 0.4, false);
+  g.restore();
+  const hy = y + top * k;
+  if (p.a === 'heart') for (let i = 0; i < 3; i++) heart(g, x + (i - 1) * 16 * k, hy - 8 * k - (i % 2) * 10 * k, 4 * k, '#F06A86');
+  if (p.a === 'sleep' || p.a === 'bark') {
+    g.font = `${Math.round(16 * k)}px Jua`; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#fff';
+    const txt = p.a === 'sleep' ? 'z z' : BREEDS[p.breed].kind === 'cat' ? '하악!' : '왈!';
+    g.strokeText(txt, x + 22 * k, hy); g.fillStyle = p.a === 'sleep' ? '#5A6E9A' : '#E8402F'; g.fillText(txt, x + 22 * k, hy);
+  }
+}
+// 스티커: 사진 테두리 쪽에 별·하트·반짝이·발바닥·도장을 흩뿌림
+function stickers(g, spots, seed) {
+  const rnd = seeded(seed);
+  const cols = ['#FFD54A', '#F06A86', '#8FC9E8', '#7B9E6B', '#fff'];
+  for (const [x, y] of spots) {
+    const type = Math.floor(rnd() * 5), s = 18 + rnd() * 14, col = cols[Math.floor(rnd() * cols.length)];
+    g.save(); g.translate(x, y); g.rotate((rnd() - 0.5) * 0.8);
+    g.lineWidth = 5; g.strokeStyle = '#fff'; g.lineJoin = 'round';
+    if (type === 0) {   // 별
+      g.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? s * 0.45 : s, a = (i / 10) * Math.PI * 2 - Math.PI / 2; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+      g.closePath(); g.stroke(); g.fillStyle = col === '#fff' ? '#FFD54A' : col; g.fill();
+    } else if (type === 1) { heart(g, 0, 0, s * 0.55, '#fff'); heart(g, 0, 0, s * 0.42, '#F06A86'); }
+    else if (type === 2) {   // 반짝이
+      g.fillStyle = col === '#fff' ? '#FFD54A' : col;
+      g.beginPath(); g.moveTo(0, -s); g.quadraticCurveTo(0, 0, s, 0); g.quadraticCurveTo(0, 0, 0, s); g.quadraticCurveTo(0, 0, -s, 0); g.quadraticCurveTo(0, 0, 0, -s); g.fill();
+    } else if (type === 3) { paw(g, 0, 4, s * 0.45, '#fff'); paw(g, 0, 4, s * 0.36, '#C57B88'); }
+    else {   // 도둑냥 도장
+      g.beginPath(); g.arc(0, 0, s * 1.1, 0, Math.PI * 2); g.fillStyle = '#E8402F'; g.fill(); g.stroke();
+      g.fillStyle = '#fff'; g.font = `${Math.round(s * 0.62)}px Jua`; g.textAlign = 'center'; g.fillText('도둑냥', 0, s * 0.22);
+    }
+    g.restore();
+  }
+}
+function cardBase(g, CW, CH, T, title) {
+  g.fillStyle = T.bg; g.fillRect(0, 0, CW, CH);
+  for (let y = 160; y < CH; y += 70) for (let x = (y / 70) % 2 ? 35 : 0; x < CW; x += 70) paw(g, x, y, 8, T.id === 'night' ? 'rgba(255,255,255,.06)' : 'rgba(120,90,60,.08)');
+  g.fillStyle = T.band; g.fillRect(0, 0, CW, 130);
+  g.textAlign = 'center'; g.fillStyle = T.accent; g.font = '60px Jua'; g.fillText(title, CW / 2, 88);
+}
+function cardFooter(g, CW, CH, T, line) {
+  g.fillStyle = T.band; g.fillRect(0, CH - 150, CW, 150);
+  g.textAlign = 'left'; g.fillStyle = T.accent; g.font = '54px Jua'; g.fillText('@doduk_nyang', 56, CH - 78);
+  g.fillStyle = '#fff'; g.font = '28px "Noto Sans KR"'; g.fillText(line, 56, CH - 36);
+  if (doduk.complete && doduk.naturalWidth) { const h = 210, w = (doduk.naturalWidth / doduk.naturalHeight) * h; g.drawImage(doduk, CW - w - 30, CH - 5 - h, w, h); }
+}
+function today() { const d = new Date(); return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`; }
+const SPOT_CX = SPOT.x + SPOT.w / 2, SPOT_CY = SPOT.y + SPOT.h / 2;
+
+// 1컷 (1080x1350)
+function makeCard1(shot, T) {
+  const CW = 1080, CH = 1350, c = document.createElement('canvas'); c.width = CW; c.height = CH;
   const g = c.getContext('2d');
   const R = (x, y, w, h, r) => { g.beginPath(); g.roundRect(x, y, w, h, r); };
-  g.fillStyle = '#FBF6EC'; g.fillRect(0, 0, CW, CH);
-  for (let y = 180; y < CH; y += 70) for (let x = (y / 70) % 2 ? 35 : 0; x < CW; x += 70) paw(g, x, y, 8, 'rgba(185,135,90,.10)');
-  g.fillStyle = '#2B2622'; g.fillRect(0, 0, CW, 140);
-  g.textAlign = 'center'; g.fillStyle = '#FFD54A'; g.font = '62px Jua'; g.fillText('도둑냥 광장 포토존', CW / 2, 94);
-  // 액자
-  R(60, 190, 960, 740, 44); g.fillStyle = '#F3E3C2'; g.fill();
-  g.save(); g.clip(); g.fillStyle = '#E9DCC4'; g.fillRect(60, 690, 960, 260); g.restore();
-  R(60, 190, 960, 740, 44); g.strokeStyle = '#2a2420'; g.lineWidth = 8; g.stroke();
-  bunting(g, 90, 990, 215, 52);
-  g.fillStyle = 'rgba(43,38,34,.12)'; g.font = '96px Jua'; g.fillText('도둑냥 광장', CW / 2, 420);
-  // 친구들 (발자국 자리에 선 손님만, 최대 6마리)
-  const now = performance.now() / 1000;
-  const group = [me, ...[...peers.values()].filter(inSpot)].slice(0, 6).sort((a, b) => a.y - b.y);
-  const k = group.length > 3 ? 2.7 : 3.3;
-  for (const p of group) {
-    const x = Math.max(170, Math.min(910, CW / 2 + (p.x - (SPOT.x + SPOT.w / 2)) * 2.3));
-    const y = 830 + (p.y - (SPOT.y + SPOT.h / 2)) * 0.6;
-    g.save(); g.translate(x, y); g.scale(k, k);
-    drawPet(g, { breed: p.breed, x: 0, y: 0, tx: 0, ty: 0, face: p.face ?? 1, noTag: true }, now, false);
-    g.restore();
+  cardBase(g, CW, CH, T, '도둑냥 광장 포토존');
+  R(60, 180, 960, 740, 44); g.fillStyle = T.frame; g.fill();
+  g.save(); g.clip(); g.fillStyle = T.floor; g.fillRect(60, 680, 960, 260); g.restore();
+  R(60, 180, 960, 740, 44); g.strokeStyle = '#2a2420'; g.lineWidth = 8; g.stroke();
+  bunting(g, 90, 990, 205, 52);
+  g.fillStyle = T.id === 'night' ? 'rgba(255,255,255,.10)' : 'rgba(43,38,34,.10)'; g.font = '96px Jua'; g.textAlign = 'center'; g.fillText('도둑냥 광장', CW / 2, 410);
+  const k = shot.length > 3 ? 2.7 : 3.3;
+  for (const p of shot) {
+    const x = Math.max(170, Math.min(910, CW / 2 + (p.x - SPOT_CX) * 2.3)), y = 820 + (p.y - SPOT_CY) * 0.6;
+    drawSnapPet(g, p, x, y, k);
     const name = BREEDS[p.breed].name;
-    g.font = '30px Jua'; const w = g.measureText(name).width + 28;
-    R(x - w / 2, y + 22, w, 44, 22); g.fillStyle = p === me ? '#E8402F' : 'rgba(31,31,34,.8)'; g.fill();
+    g.font = '30px Jua'; g.textAlign = 'center'; const w = g.measureText(name).width + 28;
+    R(x - w / 2, y + 22, w, 44, 22); g.fillStyle = p.mine ? '#E8402F' : 'rgba(31,31,34,.8)'; g.fill();
     g.fillStyle = '#fff'; g.fillText(name, x, y + 55);
   }
-  // 문구
-  const b = BREEDS[me.breed], d = new Date();
-  g.fillStyle = '#1f1f22'; g.font = '44px Jua';
-  g.fillText(group.length > 1 ? `친구 ${group.length - 1}마리랑 같이 찍었어` : '오늘 나는', CW / 2, 1010);
-  g.font = '92px Jua'; g.fillStyle = '#E8402F'; g.fillText(b.name, CW / 2, 1110);
-  g.font = '30px "Noto Sans KR"'; g.fillStyle = '#8a8a8a'; g.fillText(`${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`, CW / 2, 1160);
-  // 아래 띠
-  g.fillStyle = '#2B2622'; g.fillRect(0, 1210, CW, 140);
-  g.textAlign = 'left'; g.fillStyle = '#FFD54A'; g.font = '54px Jua'; g.fillText('@doduk_nyang', 60, 1290);
-  g.fillStyle = '#fff'; g.font = '28px "Noto Sans KR"'; g.fillText('도둑냥 창고에서 찍음 · 들어올 때마다 다른 동물', 60, 1328);
-  if (doduk.complete && doduk.naturalWidth) { const h = 210, w = (doduk.naturalWidth / doduk.naturalHeight) * h; g.drawImage(doduk, CW - w - 30, 1345 - h, w, h); }
+  stickers(g, [[90, 230], [990, 900], [1000, 260], [80, 880]], Date.now() & 0xffff);
+  const mine = shot.find((p) => p.mine) || shot[0];
+  g.textAlign = 'center'; g.fillStyle = T.ink; g.font = '44px Jua';
+  g.fillText(shot.length > 1 ? `친구 ${shot.length - 1}마리랑 같이 찍었어` : '오늘 나는', CW / 2, 1000);
+  g.font = '90px Jua'; g.fillStyle = '#E8402F'; g.fillText(BREEDS[mine.breed].name, CW / 2, 1098);
+  g.font = '30px "Noto Sans KR"'; g.fillStyle = T.sub; g.fillText(today(), CW / 2, 1150);
+  cardFooter(g, CW, CH, T, '도둑냥 창고에서 찍음 · 들어올 때마다 다른 동물');
   return c;
 }
+// 4컷 (1080x1350, 2x2)
+function makeCard4(shots, T) {
+  const CW = 1080, CH = 1350, c = document.createElement('canvas'); c.width = CW; c.height = CH;
+  const g = c.getContext('2d');
+  const R = (x, y, w, h, r) => { g.beginPath(); g.roundRect(x, y, w, h, r); };
+  cardBase(g, CW, CH, T, '도둑냥 네컷');
+  const M = 46, G = 24, top = 156, cw = (CW - M * 2 - G) / 2, ch = (CH - 150 - top - 24 - G) / 2;
+  shots.forEach((shot, i) => {
+    const x0 = M + (i % 2) * (cw + G), y0 = top + Math.floor(i / 2) * (ch + G);
+    R(x0, y0, cw, ch, 28); g.fillStyle = T.frame; g.fill();
+    g.save(); g.clip(); g.fillStyle = T.floor; g.fillRect(x0, y0 + ch * 0.66, cw, ch); bunting(g, x0 + 16, x0 + cw - 16, y0 + 14, 30); g.restore();
+    R(x0, y0, cw, ch, 28); g.strokeStyle = '#2a2420'; g.lineWidth = 6; g.stroke();
+    const k = shot.length > 3 ? 1.45 : 1.85;
+    for (const p of shot) {
+      const x = Math.max(x0 + 70, Math.min(x0 + cw - 70, x0 + cw / 2 + (p.x - SPOT_CX) * 1.45));
+      drawSnapPet(g, p, x, y0 + ch - 70 + (p.y - SPOT_CY) * 0.3, k);
+    }
+    g.beginPath(); g.arc(x0 + 40, y0 + ch - 38, 22, 0, Math.PI * 2); g.fillStyle = T.band; g.fill();
+    g.fillStyle = T.accent; g.font = '26px Jua'; g.textAlign = 'center'; g.fillText(String(i + 1), x0 + 40, y0 + ch - 29);
+  });
+  stickers(g, [[M + 10, top + 8], [CW - M - 14, top + ch + G / 2], [CW / 2, top + ch * 2 + G - 6], [M + 6, top + ch + G + ch * 0.55], [CW - M - 6, top + 14]], Date.now() & 0xffff);
+  const mine = shots[0].find((p) => p.mine) || shots[0][0];
+  const n = Math.max(...shots.map((s) => s.length));
+  cardFooter(g, CW, CH, T, `${BREEDS[mine.breed].name}${n > 1 ? ` 외 ${n - 1}마리` : ''} · ${today()} · 도둑냥 창고`);
+  return c;
+}
+
 const snapBtn = document.getElementById('snap');
 const photoEl = document.getElementById('photo');
+const boothEl = document.getElementById('booth');
 let photoBlob = null, photoUrl = null;
-snapBtn.onclick = () => {
-  flashUntil = performance.now() + 450;
-  speech.set(myId, { text: '찰칵', until: Date.now() + 1500 });
-  setTimeout(() => {
-    makeCard().toBlob((blob) => {
-      photoBlob = blob;
-      if (photoUrl) URL.revokeObjectURL(photoUrl);
-      photoUrl = URL.createObjectURL(blob);
-      document.getElementById('pImg').src = photoUrl;
-      const save = document.getElementById('pSave');
-      save.href = photoUrl; save.download = `doduk-${BREEDS[me.breed].name}.png`;
-      const file = new File([blob], 'doduk.png', { type: 'image/png' });
-      document.getElementById('pShare').style.display = navigator.canShare && navigator.canShare({ files: [file] }) ? '' : 'none';
-      photoEl.classList.add('open');
-    }, 'image/png');
-  }, 300);
-};
+function showPhoto(canvasEl) {
+  canvasEl.toBlob((blob) => {
+    photoBlob = blob;
+    if (photoUrl) URL.revokeObjectURL(photoUrl);
+    photoUrl = URL.createObjectURL(blob);
+    document.getElementById('pImg').src = photoUrl;
+    const save = document.getElementById('pSave');
+    save.href = photoUrl; save.download = `doduk-${BREEDS[me.breed].name}.png`;
+    const file = new File([blob], 'doduk.png', { type: 'image/png' });
+    document.getElementById('pShare').style.display = navigator.canShare && navigator.canShare({ files: [file] }) ? '' : 'none';
+    photoEl.classList.add('open');
+  }, 'image/png');
+}
+async function shoot() {
+  if (booth.busy) return;
+  booth.busy = true; boothEl.classList.remove('open');
+  const shots = [];
+  for (let s = 0; s < booth.cuts; s++) {
+    for (let n = 3; n >= 1; n--) { countdown = { n, shot: s + 1, total: booth.cuts }; await sleep(650); }
+    countdown = null; flashUntil = performance.now() + 450;
+    shots.push(capture());
+    speech.set(myId, { text: '찰칵', until: Date.now() + 900 });
+    await sleep(600);
+  }
+  booth.busy = false;
+  const T = THEMES.find((x) => x.id === booth.theme) || THEMES[0];
+  showPhoto(booth.cuts === 4 ? makeCard4(shots, T) : makeCard1(shots[0], T));
+}
+function chips(el, list, isOn, onPick) {
+  el.innerHTML = '';
+  for (const item of list) {
+    const b = document.createElement('button');
+    b.textContent = item.name;
+    if (item.swatch) { b.classList.add('sw'); b.style.setProperty('--sw', item.swatch); }
+    if (isOn(item)) b.classList.add('on');
+    b.onclick = () => { onPick(item); renderBooth(); };
+    el.appendChild(b);
+  }
+}
+function renderBooth() {
+  chips(document.getElementById('accChips'), ACCESSORIES, (a) => a.id === me.acc, (a) => {
+    me.acc = a.id;
+    try { localStorage.setItem('doduk-acc', a.id); } catch {}
+    net.send();   // 다른 손님 화면에도 바로 보이게
+  });
+  chips(document.getElementById('themeChips'), THEMES.map((x) => ({ ...x, swatch: x.frame })), (x) => x.id === booth.theme, (x) => {
+    booth.theme = x.id;
+    try { localStorage.setItem('doduk-theme', x.id); } catch {}
+  });
+  chips(document.getElementById('cutChips'), [{ id: 4, name: '4컷' }, { id: 1, name: '1컷' }], (x) => x.id === booth.cuts, (x) => { booth.cuts = x.id; });
+}
+snapBtn.onclick = () => { if (booth.busy) return; renderBooth(); boothEl.classList.toggle('open'); };
+document.getElementById('bClose').onclick = () => boothEl.classList.remove('open');
+document.getElementById('shoot').onclick = shoot;
 document.getElementById('pShare').onclick = () => {
   const file = new File([photoBlob], 'doduk.png', { type: 'image/png' });
   navigator.share({ files: [file], text: '도둑냥 창고에서 찍었어 @doduk_nyang' }).catch(() => {});
@@ -919,6 +1051,7 @@ function frame(now) {
   const { w, h } = size();
   camX = w <= VIEW_W ? 0 : Math.max(0, Math.min(w - VIEW_W, me.x - VIEW_W / 2));
   camY = viewH >= h ? -(viewH - h) / 2 : Math.max(0, Math.min(h - viewH, me.y - viewH * 0.55));
+  if (info.photo && (boothEl.classList.contains('open') || countdown)) camY = SPOT.y + SPOT.h / 2 - viewH * 0.27;   // 꾸미는 동안 패널에 가리지 않게 발자국 자리를 위로
   ctx.setTransform(scale, 0, 0, scale, -camX * scale, -camY * scale);
   ctx.clearRect(camX, camY, VIEW_W, viewH);
   if (isPlaza()) drawPlaza(t); else if (info.photo) drawPhotoRoom(t); else if (info.treasure) drawTreasureRoom(); else if (info.field) drawField(); else drawRoom(info);
@@ -953,7 +1086,15 @@ function frame(now) {
     ctx.globalAlpha = (flashUntil - performance.now()) / 450; ctx.fillStyle = '#fff';
     ctx.fillRect(camX, camY, VIEW_W, viewH); ctx.globalAlpha = 1;
   }
-  const canSnap = !!info.photo && inSpot(me) && Math.hypot(me.tx - me.x, me.ty - me.y) < 2;
+  if (countdown) {
+    const cx = camX + VIEW_W / 2, cy = camY + viewH * 0.33;
+    ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.beginPath(); ctx.arc(cx, cy, 80, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 6; ctx.stroke();
+    ctx.fillStyle = '#E8402F'; ctx.font = '100px Jua'; ctx.textAlign = 'center'; ctx.fillText(String(countdown.n), cx, cy + 36);
+    label(`${countdown.shot}/${countdown.total} · 포즈! 행동 버튼도 돼`, cx, cy + 128, '#2B2622', '#FFD54A', '22px Jua');
+  }
+  if (!info.photo && boothEl.classList.contains('open')) boothEl.classList.remove('open');
+  const canSnap = !!info.photo && !booth.busy && inSpot(me) && Math.hypot(me.tx - me.x, me.ty - me.y) < 2;
   if (canSnap !== snapBtn.classList.contains('show')) snapBtn.classList.toggle('show', canSnap);
 
   if (info.treasure) {
