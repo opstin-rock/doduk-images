@@ -72,16 +72,25 @@ function doors() {
 }
 
 // ---------- 다른 손님 (실시간, 같은 방에 있는 손님만) ----------
-const peers = new Map();   // id → { breed, x, y, tx, ty, seen }
+// Presence(접속자 목록): 누가 들어오고 나갔는지, 품종, 마지막 목표 위치 (늦게 들어온 사람용)
+// Broadcast(즉시 메시지): 바닥을 누를 때마다 "어디서 출발해 어디로 간다"를 바로 보냄
+const peers = new Map();   // id → { breed, x, y, tx, ty, seq, seen, goneAt }
 function onPeer(p) {
   if (p.id === myId) return;
   if (p.scene !== me.scene) { peers.delete(p.id); return; }
   const cur = peers.get(p.id);
-  // 예전 정보가 늦게 도착해도 되돌아가지 않게, 더 새 정보(ts)만 반영
-  if (cur && p.ts && cur.ts && p.ts <= cur.ts) { cur.goneAt = 0; cur.seen = Date.now(); return; }
-  if (cur) Object.assign(cur, { breed: p.breed, tx: p.tx, ty: p.ty, ts: p.ts, seen: Date.now(), goneAt: 0 });
-  // 처음 보는 손님은 가려던 자리(tx, ty)에 바로 세움 (출발점으로 순간이동했다가 다시 걷는 일 없게)
-  else peers.set(p.id, { breed: p.breed, x: p.tx, y: p.ty, tx: p.tx, ty: p.ty, ts: p.ts, seen: Date.now() });
+  if (cur) { cur.breed = p.breed; cur.seen = Date.now(); cur.goneAt = 0; return; }   // 이동은 Broadcast가 맡음
+  // 처음 보는 손님은 가려던 자리에 바로 세움
+  peers.set(p.id, { breed: p.breed, x: p.tx, y: p.ty, tx: p.tx, ty: p.ty, seq: 0, seen: Date.now(), goneAt: 0 });
+}
+function onMove(m) {
+  if (m.id === myId || m.scene !== me.scene) return;
+  let cur = peers.get(m.id);
+  if (!cur) { cur = { breed: m.breed, x: m.sx, y: m.sy, seq: 0 }; peers.set(m.id, cur); }
+  if (m.seq <= cur.seq) return;   // 늦게 도착한 예전 이동은 무시
+  // 화면 속 위치가 출발점과 많이 다르면 출발점으로 맞추고, 비슷하면 그대로 이어서 걸음
+  if (Math.hypot(cur.x - m.sx, cur.y - m.sy) > 50) { cur.x = m.sx; cur.y = m.sy; }
+  Object.assign(cur, { breed: m.breed, tx: m.tx, ty: m.ty, seq: m.seq, seen: Date.now(), goneAt: 0 });
 }
 
 // ---------- 말풍선: 정해진 문구만 (자유 입력 없음). 번호만 주고받아서 다른 글이 끼어들 수 없음 ----------
@@ -100,18 +109,20 @@ function onSay(id, i) {
 
 const net = (() => {
   const cfg = window.DODUK || {};
-  let seq = 0;   // 보낼 때마다 1씩 늘어나는 번호 (어느 정보가 최신인지 구분)
-  const payload = () => ({ id: me.id, breed: me.breed, scene: me.scene, x: Math.round(me.x), y: Math.round(me.y), tx: Math.round(me.tx), ty: Math.round(me.ty), ts: Date.now() * 100 + (seq++ % 100) });
+  let seq = 0;
+  const presence = () => ({ id: me.id, breed: me.breed, scene: me.scene, tx: Math.round(me.tx), ty: Math.round(me.ty), ts: Date.now() });
+  const move = () => ({ id: me.id, breed: me.breed, scene: me.scene, sx: Math.round(me.x), sy: Math.round(me.y), tx: Math.round(me.tx), ty: Math.round(me.ty), seq: ++seq });
   if (cfg.supabaseUrl && cfg.supabaseKey && window.supabase) {
-    // Supabase Realtime presence: 방마다 채널을 따로 열어 그 방 접속자끼리 위치 공유
     // worker: 화면이 뒤로 가도 연결 유지 신호(heartbeat)가 밀리지 않게 별도 작업자에서 보냄
     const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, { realtime: { worker: true } });
-    let ch = null, last = 0, pending = null, status = 'CONNECTING';
+    let ch = null, status = 'CONNECTING', trackTimer = null;
     const join = (scene) => {
-      const moving = ch && ch.topic !== `realtime:doduk-${scene}`;
+      const changing = ch && ch.topic !== `realtime:doduk-${scene}`;
       if (ch) { ch.untrack(); client.removeChannel(ch); }
-      if (moving || !ch) peers.clear();   // 방을 옮길 때만 비움 (같은 방 재접속 때 깜빡이지 않게)
-      ch = client.channel(`doduk-${scene}`, { config: { presence: { key: myId } } });
+      if (changing || !ch) peers.clear();   // 방을 옮길 때만 비움 (같은 방 재접속 때 깜빡이지 않게)
+      status = 'CONNECTING';
+      ch = client.channel(`doduk-${scene}`, { config: { presence: { key: myId }, broadcast: { self: false } } });
+      ch.on('broadcast', { event: 'move' }, ({ payload }) => onMove(payload));
       ch.on('broadcast', { event: 'say' }, ({ payload }) => onSay(payload.id, payload.i));
       ch.on('presence', { event: 'sync' }, () => {
         const state = ch.presenceState();
@@ -119,20 +130,18 @@ const net = (() => {
         // 같은 손님이 재접속 중이면 정보가 2개 겹칠 수 있음 → 가장 최신 것만 사용
         for (const metas of Object.values(state)) onPeer(metas.reduce((a, b) => ((b.ts ?? 0) > (a.ts ?? 0) ? b : a)));
         // 목록에서 빠진 손님은 바로 지우지 않고 8초 기다림 (잠깐 끊겼다 붙는 경우 깜빡임 방지)
-        for (const [id, p] of peers) if (!ids.has(id) && !p.goneAt) p.goneAt = Date.now();
+        for (const [id, q] of peers) if (!ids.has(id) && !q.goneAt) q.goneAt = Date.now();
       });
       const mine = ch;
       ch.subscribe((s) => {
         if (mine !== ch) return;   // 방을 옮기며 닫은 예전 채널의 신호는 무시
         status = s;
-        if (s === 'SUBSCRIBED') ch.track(payload());   // 끊겼다 다시 붙으면 Supabase가 알아서 재접속하고 여기로 다시 옴
+        if (s === 'SUBSCRIBED') { ch.track(presence()); ch.send({ type: 'broadcast', event: 'move', payload: move() }); }
       });
     };
     join(me.scene);
-    // 폰에서 다른 앱 갔다 오면 연결이 끊겼을 수 있어서, 돌아오면 다시 접속해 위치를 알림
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'visible') return;
-      if (status === 'SUBSCRIBED') ch.track(payload());
+      if (document.visibilityState === 'visible' && status === 'SUBSCRIBED') ch.track(presence());
     });
     return {
       mode: 'online',
@@ -140,24 +149,32 @@ const net = (() => {
       join,
       say(i) { ch && ch.send({ type: 'broadcast', event: 'say', payload: { id: myId, i } }); },
       send() {
-        clearTimeout(pending);
-        pending = setTimeout(() => { last = Date.now(); ch && ch.track(payload()); }, Math.max(0, 250 - (Date.now() - last)));
+        if (!ch || status !== 'SUBSCRIBED') return;
+        ch.send({ type: 'broadcast', event: 'move', payload: move() });   // 바로 보냄
+        // 접속자 목록의 목표 위치는 천천히 갱신 (늦게 들어온 사람이 볼 위치)
+        clearTimeout(trackTimer);
+        trackTimer = setTimeout(() => ch.track(presence()), 1500);
       },
     };
   }
   // 테스트 모드: 같은 브라우저의 다른 탭끼리만 보임
   const bc = new BroadcastChannel('doduk-warehouse');
-  bc.onmessage = (e) => (e.data.bye ? peers.delete(e.data.id) : e.data.say !== undefined ? (e.data.scene === me.scene && onSay(e.data.id, e.data.say)) : onPeer(e.data));
+  bc.onmessage = ({ data: d }) => {
+    if (d.bye) peers.delete(d.id);
+    else if (d.type === 'say') { if (d.scene === me.scene) onSay(d.id, d.i); }
+    else if (d.type === 'move') onMove(d);
+    else onPeer(d);
+  };
   setInterval(() => {
-    bc.postMessage(payload());
-    for (const [id, p] of peers) if (Date.now() - p.seen > 6000) peers.delete(id);
+    bc.postMessage(presence());
+    for (const [id, q] of peers) if (Date.now() - q.seen > 6000) peers.delete(id);
   }, 2000);
   addEventListener('pagehide', () => bc.postMessage({ id: myId, bye: true }));
   return {
     mode: 'local',
-    join() { peers.clear(); bc.postMessage(payload()); },
-    send() { bc.postMessage(payload()); },
-    say(i) { bc.postMessage({ id: myId, scene: me.scene, say: i }); },
+    join() { peers.clear(); bc.postMessage(presence()); },
+    send() { bc.postMessage({ type: 'move', ...move() }); },
+    say(i) { bc.postMessage({ type: 'say', id: myId, scene: me.scene, i }); },
   };
 })();
 net.send();
