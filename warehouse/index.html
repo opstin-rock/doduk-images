@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>도둑냥 창고</title>
+<meta name="description" content="폐쇄몰 창고 고양이 도둑냥이 오늘 훔쳐온 특가를 구경하는 곳">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700;900&display=swap">
+<style>
+  :root { --ink:#1f1f22; --cream:#fbf6ec; --yellow:#ffd54a; --red:#e8402f; --gray:#8a8a8a; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; background:#2a2622; overflow:hidden; font-family:"Noto Sans KR",sans-serif; color:var(--ink); }
+  #game { position:fixed; inset:0; width:100%; height:100%; touch-action:none; display:block; }
+  .top { position:fixed; left:12px; right:12px; top:10px; display:flex; justify-content:space-between; align-items:center; pointer-events:none; }
+  .chip { pointer-events:auto; background:rgba(255,255,255,.92); border-radius:999px; padding:6px 12px; font-size:13px; font-weight:700; box-shadow:0 2px 8px rgba(0,0,0,.18); }
+  .chip b { color:var(--red); }
+  .title { font-family:"Jua",sans-serif; font-size:17px; }
+  .hint { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); background:rgba(0,0,0,.6); color:#fff; font-size:13px; padding:7px 14px; border-radius:999px; pointer-events:none; transition:opacity .4s; }
+  .sheet { position:fixed; left:0; right:0; bottom:0; background:#fff; border-radius:20px 20px 0 0; padding:16px 16px 20px; box-shadow:0 -6px 24px rgba(0,0,0,.25); transform:translateY(105%); transition:transform .25s ease; max-width:560px; margin:0 auto; }
+  .sheet.open { transform:translateY(0); }
+  .sheet .row { display:flex; gap:12px; }
+  .sheet img { width:104px; height:104px; object-fit:contain; border-radius:12px; border:1px solid #eee; background:#fff; flex:none; }
+  .sheet .name { font-weight:900; font-size:16px; line-height:1.3; }
+  .sheet .spec { color:#666; font-size:13px; margin-top:3px; }
+  .sheet .price { font-family:"Jua",sans-serif; font-size:28px; margin-top:4px; }
+  .sheet .price s { font-family:"Noto Sans KR"; color:var(--gray); font-size:13px; margin-right:6px; }
+  .sheet .price em { font-style:normal; color:var(--red); font-size:20px; margin-right:6px; }
+  .sheet .per { display:inline-block; background:var(--yellow); font-weight:900; font-size:13px; border-radius:8px; padding:2px 8px; }
+  .sheet .meta { color:#666; font-size:12px; margin-top:8px; line-height:1.5; }
+  .sheet .say { margin-top:10px; background:var(--cream); border-radius:12px; padding:10px 12px; font-size:14px; line-height:1.45; }
+  .sheet .say b { font-family:"Jua",sans-serif; font-weight:400; margin-right:6px; }
+  .btns { display:flex; gap:8px; margin-top:12px; }
+  .btns button, .btns a { flex:1; border:0; border-radius:12px; padding:12px 8px; font-size:14px; font-weight:900; text-align:center; text-decoration:none; font-family:inherit; cursor:pointer; }
+  .btns .listen { background:#f1f1f1; color:var(--ink); }
+  .btns .go { background:var(--ink); color:#fff; }
+  .close { position:absolute; right:12px; top:8px; border:0; background:none; font-size:22px; color:#999; cursor:pointer; }
+  .login { color:var(--gray); font-size:11px; text-align:center; margin-top:8px; }
+  .talk { position:fixed; left:12px; bottom:16px; border:0; border-radius:999px; background:var(--ink); color:#fff; font-family:"Jua",sans-serif; font-size:16px; padding:10px 16px; box-shadow:0 3px 10px rgba(0,0,0,.3); cursor:pointer; }
+  .phrases { position:fixed; left:12px; right:12px; bottom:64px; max-width:420px; background:#fff; border-radius:16px; padding:10px; display:none; flex-wrap:wrap; gap:6px; box-shadow:0 6px 20px rgba(0,0,0,.25); }
+  .phrases.open { display:flex; }
+  .phrases button { border:0; border-radius:999px; background:var(--cream); font-family:"Jua",sans-serif; font-size:15px; padding:8px 12px; cursor:pointer; }
+  .phrases button:first-child { background:var(--yellow); }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div class="top">
+  <div class="chip" id="me">들어가는 중</div>
+  <div class="chip" id="count">지금 <b>1</b>마리 구경 중</div>
+</div>
+<div class="hint" id="hint">바닥을 누르면 걸어가 · 선반 앞에 서면 물건이 보여 · 양옆 문은 다른 방</div>
+<button class="talk" id="talk">말풍선</button>
+<div class="phrases" id="phrases"></div>
+<div class="sheet" id="sheet">
+  <button class="close" id="close" aria-label="닫기">×</button>
+  <div class="row">
+    <img id="sImg" alt="">
+    <div>
+      <div class="name" id="sName"></div>
+      <div class="spec" id="sSpec"></div>
+      <div class="price" id="sPrice"></div>
+      <span class="per" id="sPer"></span>
+    </div>
+  </div>
+  <div class="meta" id="sMeta"></div>
+  <div class="say"><b>도둑냥</b><span id="sSay"></span></div>
+  <div class="btns">
+    <a class="go" id="go" target="_blank" rel="noopener">상세페이지 보기</a>
+  </div>
+  <div class="login">폐쇄몰이라 구경은 그냥 되고, 구매할 때 로그인만 하면 돼</div>
+</div>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="pets.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
