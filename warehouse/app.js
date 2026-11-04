@@ -468,7 +468,7 @@ function drawBooth(t) {
   rr(c.x - 80, c.y - 28, 160, 52, 10); ctx.fillStyle = '#6B4A30'; ctx.fill();
   rr(c.x - 80, c.y - 28, 160, 14, 10); ctx.fillStyle = '#8A6343'; ctx.fill();
   if (!bot.home || (bot.say && Date.now() < bot.say.until)) return;   // 도둑냥이 청소하러 나가면 부스는 비어 있음
-  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 소품 쓰고 네컷 찍어 가', '오른쪽 문은 보물창고, 내가 숨겨둔 거 찾아봐', '오른쪽 위 문은 운동장, 공 차러 가자', '구경은 공짜, 살 때만 로그인'];
+  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 소품 쓰고 네컷 찍어 가', '오른쪽 문은 보물창고, 내가 숨겨둔 거 찾아봐', '오른쪽 위 문은 운동장, 공 차러 가자', '오른쪽 아래 천막은 점집, 오늘의 카드 뽑아 봐', '구경은 공짜, 살 때만 로그인'];
   const msg = lines[Math.floor(t / 4) % lines.length];
   ctx.font = '18px Jua'; const w = ctx.measureText(msg).width + 24;
   const bx = c.x + 30, by = c.y - 172;
@@ -1021,6 +1021,167 @@ function drawBot(t, now) {
   return bot.y - h - 6;
 }
 
+// ---------- 도둑냥 점집 (타로) ----------
+// 광장 오른쪽 아래 천막. 앞에 서면 "타로 보기" 버튼. 집사 운세 / 우리 애 마음 중 고르고 카드 3장 중 1장을 뽑음
+// 결과는 하루 동안 고정(이 브라우저 기준). 해석 문구는 data/tarot.json
+const TENT = { x: 1150, y: 1560 };
+let tarotData = null;
+fetch('data/tarot.json').then((r) => r.json()).then((d) => { tarotData = d; }).catch(() => {});
+const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI'];
+const TAROT_MODES = { human: '집사 운세', pet: '우리 애 마음' };
+
+function drawTent(t) {
+  const { x, y } = TENT;
+  ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(x, y + 4, 120, 22, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(x - 110, y); ctx.lineTo(x, y - 170); ctx.lineTo(x + 110, y); ctx.closePath(); ctx.fillStyle = '#5B3F8C'; ctx.fill(); ctx.stroke();
+  ctx.save(); ctx.clip(); ctx.fillStyle = '#7A5BB0';
+  for (let i = -3; i <= 3; i += 2) { ctx.beginPath(); ctx.moveTo(x + i * 16, y); ctx.lineTo(x, y - 170); ctx.lineTo(x + (i + 1) * 16, y); ctx.closePath(); ctx.fill(); }
+  ctx.restore();
+  ctx.beginPath(); ctx.moveTo(x - 34, y); ctx.lineTo(x, y - 78); ctx.lineTo(x + 34, y); ctx.closePath(); ctx.fillStyle = '#2B2240'; ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#FFD54A'; star(ctx, x, y - 186 + Math.sin(t * 2) * 3, 12, 5);
+  rr(x - 70, y - 120, 140, 34, 10); ctx.fillStyle = '#2B2240'; ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#FFD54A'; ctx.font = '20px Jua'; ctx.textAlign = 'center'; ctx.fillText('도둑냥 점집', x, y - 96);
+}
+function star(g, x, y, r, n = 5) {
+  g.beginPath();
+  for (let i = 0; i < n * 2; i++) { const rr2 = i % 2 ? r * 0.45 : r, a = (i / (n * 2)) * Math.PI * 2 - Math.PI / 2; g.lineTo(x + Math.cos(a) * rr2, y + Math.sin(a) * rr2); }
+  g.closePath(); g.fill();
+}
+// 카드 그림 기호 (단순한 도형만 사용)
+function tarotSymbol(g, s, x, y, r) {
+  g.save(); g.fillStyle = '#FFD54A'; g.strokeStyle = '#FFD54A'; g.lineWidth = r * 0.12; g.lineCap = 'round'; g.lineJoin = 'round';
+  const circ = (cx, cy, rad, fill = true) => { g.beginPath(); g.arc(cx, cy, rad, 0, Math.PI * 2); fill ? g.fill() : g.stroke(); };
+  if (s === 'star') star(g, x, y, r, 5);
+  else if (s === 'star4') star(g, x, y, r, 4);
+  else if (s === 'sun') { circ(x, y, r * 0.5); for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; g.beginPath(); g.moveTo(x + Math.cos(a) * r * 0.65, y + Math.sin(a) * r * 0.65); g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); g.stroke(); } }
+  else if (s === 'moon') { circ(x, y, r * 0.8); g.globalCompositeOperation = 'destination-out'; circ(x + r * 0.35, y - r * 0.2, r * 0.7); g.globalCompositeOperation = 'source-over'; }
+  else if (s === 'heart') { g.beginPath(); g.moveTo(x, y + r * 0.8); g.bezierCurveTo(x - r * 1.4, y - r * 0.1, x - r * 0.6, y - r * 1.1, x, y - r * 0.4); g.bezierCurveTo(x + r * 0.6, y - r * 1.1, x + r * 1.4, y - r * 0.1, x, y + r * 0.8); g.fill(); }
+  else if (s === 'crown') { g.beginPath(); g.moveTo(x - r, y + r * 0.5); g.lineTo(x - r, y - r * 0.5); g.lineTo(x - r * 0.5, y); g.lineTo(x, y - r * 0.7); g.lineTo(x + r * 0.5, y); g.lineTo(x + r, y - r * 0.5); g.lineTo(x + r, y + r * 0.5); g.closePath(); g.fill(); }
+  else if (s === 'key') { circ(x - r * 0.45, y, r * 0.35, false); g.beginPath(); g.moveTo(x - r * 0.1, y); g.lineTo(x + r, y); g.moveTo(x + r * 0.7, y); g.lineTo(x + r * 0.7, y + r * 0.35); g.moveTo(x + r * 0.45, y); g.lineTo(x + r * 0.45, y + r * 0.3); g.stroke(); }
+  else if (s === 'arrow') { g.beginPath(); g.moveTo(x - r, y + r * 0.6); g.lineTo(x + r * 0.7, y - r * 0.7); g.stroke(); g.beginPath(); g.moveTo(x + r, y - r); g.lineTo(x + r * 0.2, y - r * 0.85); g.lineTo(x + r * 0.85, y - r * 0.2); g.closePath(); g.fill(); }
+  else if (s === 'lamp') { g.beginPath(); g.moveTo(x - r * 0.4, y - r * 0.6); g.lineTo(x + r * 0.4, y - r * 0.6); g.lineTo(x + r * 0.55, y + r * 0.5); g.lineTo(x - r * 0.55, y + r * 0.5); g.closePath(); g.stroke(); circ(x, y, r * 0.22); g.beginPath(); g.moveTo(x, y - r * 0.6); g.lineTo(x, y - r); g.stroke(); }
+  else if (s === 'wheel') { circ(x, y, r * 0.85, false); circ(x, y, r * 0.15); for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * r * 0.85, y + Math.sin(a) * r * 0.85); g.stroke(); } }
+  else if (s === 'scale') { g.beginPath(); g.moveTo(x, y - r); g.lineTo(x, y + r * 0.8); g.moveTo(x - r * 0.4, y + r * 0.8); g.lineTo(x + r * 0.4, y + r * 0.8); g.moveTo(x - r, y - r * 0.6); g.lineTo(x + r, y - r * 0.6); g.stroke(); for (const sx of [-1, 1]) { g.beginPath(); g.arc(x + sx * r * 0.8, y - r * 0.1, r * 0.3, 0, Math.PI); g.fill(); } }
+  else if (s === 'drop') { g.beginPath(); g.moveTo(x, y - r); g.quadraticCurveTo(x + r * 0.8, y + r * 0.1, x, y + r * 0.8); g.quadraticCurveTo(x - r * 0.8, y + r * 0.1, x, y - r); g.fill(); }
+  else if (s === 'cup') { g.beginPath(); g.moveTo(x - r * 0.7, y - r * 0.6); g.lineTo(x + r * 0.7, y - r * 0.6); g.quadraticCurveTo(x + r * 0.6, y + r * 0.2, x, y + r * 0.25); g.quadraticCurveTo(x - r * 0.6, y + r * 0.2, x - r * 0.7, y - r * 0.6); g.fill(); g.beginPath(); g.moveTo(x, y + r * 0.25); g.lineTo(x, y + r * 0.8); g.moveTo(x - r * 0.4, y + r * 0.8); g.lineTo(x + r * 0.4, y + r * 0.8); g.stroke(); }
+  else if (s === 'candy') { g.save(); g.translate(x, y); g.rotate(-0.4); g.beginPath(); g.ellipse(0, 0, r * 0.55, r * 0.4, 0, 0, Math.PI * 2); g.fill(); for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(sx * r * 0.5, 0); g.lineTo(sx * r, -r * 0.35); g.lineTo(sx * r, r * 0.35); g.closePath(); g.fill(); } g.restore(); }
+  else if (s === 'bolt') { g.beginPath(); g.moveTo(x + r * 0.2, y - r); g.lineTo(x - r * 0.5, y + r * 0.1); g.lineTo(x, y + r * 0.1); g.lineTo(x - r * 0.2, y + r); g.lineTo(x + r * 0.5, y - r * 0.15); g.lineTo(x, y - r * 0.15); g.closePath(); g.fill(); }
+  else if (s === 'bell') { g.beginPath(); g.moveTo(x - r * 0.7, y + r * 0.5); g.quadraticCurveTo(x - r * 0.6, y - r * 0.9, x, y - r * 0.9); g.quadraticCurveTo(x + r * 0.6, y - r * 0.9, x + r * 0.7, y + r * 0.5); g.closePath(); g.fill(); circ(x, y + r * 0.7, r * 0.18); }
+  else if (s === 'circle') { circ(x, y, r * 0.85, false); circ(x, y, r * 0.55, false); star(g, x, y, r * 0.3, 4); }
+  else if (s === 'flower') { for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; circ(x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.5, r * 0.35); } g.fillStyle = '#2B2240'; circ(x, y, r * 0.3); }
+  else paw(g, x, y + r * 0.3, r * 0.55, '#FFD54A');
+  g.restore();
+}
+// 카드 앞면 (w x h 크기, 왼쪽 위 0,0 기준)
+function drawTarotFront(g, card, w, h) {
+  const R = (x, y, ww, hh, r) => { g.beginPath(); g.roundRect(x, y, ww, hh, r); };
+  const grad = g.createLinearGradient(0, 0, 0, h); grad.addColorStop(0, '#2B2240'); grad.addColorStop(1, '#1A1530');
+  R(0, 0, w, h, w * 0.06); g.fillStyle = grad; g.fill();
+  R(w * 0.05, w * 0.05, w * 0.9, h - w * 0.1, w * 0.04); g.strokeStyle = '#FFD54A'; g.lineWidth = w * 0.012; g.stroke();
+  g.fillStyle = 'rgba(255,213,74,.35)'; for (const [sx, sy] of [[0.2, 0.25], [0.8, 0.3], [0.15, 0.62], [0.85, 0.66], [0.3, 0.75], [0.72, 0.18]]) star(g, w * sx, h * sy, w * 0.025, 4);
+  g.fillStyle = '#FFD54A'; g.textAlign = 'center'; g.font = `${Math.round(w * 0.1)}px Jua`; g.fillText(ROMAN[card.n], w / 2, h * 0.13);
+  tarotSymbol(g, card.symbol, w / 2, h * 0.47, w * 0.26);
+  g.font = `${Math.round(w * 0.11)}px Jua`; g.fillText(card.name, w / 2, h * 0.86);
+}
+function drawTarotBack(g, w, h) {
+  const R = (x, y, ww, hh, r) => { g.beginPath(); g.roundRect(x, y, ww, hh, r); };
+  R(0, 0, w, h, w * 0.06); g.fillStyle = '#5B3F8C'; g.fill();
+  R(w * 0.05, w * 0.05, w * 0.9, h - w * 0.1, w * 0.04); g.strokeStyle = '#FFD54A'; g.lineWidth = w * 0.012; g.stroke();
+  for (let yy = 0.18; yy < 0.9; yy += 0.14) for (let xx = 0.22; xx < 0.9; xx += 0.28) paw(g, w * xx, h * yy, w * 0.04, 'rgba(255,213,74,.25)');
+  g.fillStyle = '#FFD54A'; star(g, w / 2, h / 2, w * 0.14, 5);
+}
+function wrapText(g, text, maxW) {
+  const lines = []; let line = '';
+  for (const word of text.split(' ')) {
+    const test = line ? `${line} ${word}` : word;
+    if (g.measureText(test).width > maxW && line) { lines.push(line); line = word; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+// 화면 (모달)
+const tarotEl = document.getElementById('tarot');
+const tarotBtn = document.getElementById('tarotBtn');
+let tarotMode = 'human';
+const tarotKey = (mode) => `doduk-tarot-${dayKey()}-${mode}`;
+function savedPick(mode) { try { const v = localStorage.getItem(tarotKey(mode)); return v === null ? null : Number(v); } catch { return null; } }
+function cardCanvas(card, w, h, back) {
+  const c = document.createElement('canvas'); c.width = w * 2; c.height = h * 2; c.style.width = `${w}px`; c.style.height = `${h}px`;
+  const g = c.getContext('2d'); g.scale(2, 2);
+  back ? drawTarotBack(g, w, h) : drawTarotFront(g, card, w, h);
+  return c;
+}
+function renderTarot() {
+  document.querySelectorAll('#tarot .tabs button').forEach((b) => b.classList.toggle('on', b.dataset.mode === tarotMode));
+  const area = document.getElementById('tarotArea');
+  area.innerHTML = '';
+  if (!tarotData) { area.textContent = '카드를 섞는 중이에요'; return; }
+  const picked = savedPick(tarotMode);
+  if (picked !== null) return showReading(tarotData.cards.find((c) => c.n === picked), true);
+  const hint = document.createElement('div'); hint.className = 'tarot-hint';
+  hint.textContent = tarotMode === 'human' ? '마음을 가라앉히고 한 장을 골라 주세요' : '우리 애를 떠올리면서 한 장을 골라 주세요';
+  area.appendChild(hint);
+  const row = document.createElement('div'); row.className = 'tarot-row';
+  // 3장 후보: 오늘 날짜 + 메뉴 + 이 브라우저마다 다르게 섞음
+  let uid = 'x'; try { uid = localStorage.getItem('doduk-uid') || Math.random().toString(36).slice(2); localStorage.setItem('doduk-uid', uid); } catch {}
+  let seed = dayKey() * 31 + (tarotMode === 'pet' ? 7 : 3); for (const ch of uid) seed = (seed * 33 + ch.charCodeAt(0)) | 0;
+  const rnd = seeded(seed), deck = tarotData.cards.slice();
+  for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+  deck.slice(0, 3).forEach((card) => {
+    const slot = document.createElement('button'); slot.className = 'tarot-card';
+    slot.appendChild(cardCanvas(null, 92, 150, true));
+    slot.onclick = () => {
+      try { localStorage.setItem(tarotKey(tarotMode), String(card.n)); } catch {}
+      slot.classList.add('flip');
+      setTimeout(() => showReading(card, false), 450);
+    };
+    row.appendChild(slot);
+  });
+  area.appendChild(row);
+}
+function showReading(card, again) {
+  const area = document.getElementById('tarotArea');
+  area.innerHTML = '';
+  const wrap = document.createElement('div'); wrap.className = 'tarot-result';
+  wrap.appendChild(cardCanvas(card, 120, 196, false));
+  const box = document.createElement('div');
+  box.innerHTML = `<div class="tarot-mode">${again ? '오늘 이미 뽑은 카드' : '오늘의 카드'} · ${TAROT_MODES[tarotMode]}</div><div class="tarot-name">${card.name}<small>${card.key}</small></div>`;
+  const p = document.createElement('p'); p.textContent = card[tarotMode]; box.appendChild(p);
+  wrap.appendChild(box);
+  area.appendChild(wrap);
+  const btns = document.createElement('div'); btns.className = 'btns';
+  const save = document.createElement('button'); save.className = 'go'; save.textContent = '이미지로 저장';
+  save.onclick = () => { tarotEl.classList.remove('open'); showPhoto(makeTarotCard(card, tarotMode)); };
+  btns.appendChild(save); area.appendChild(btns);
+  const note = document.createElement('div'); note.className = 'login'; note.textContent = '재미로 보는 오늘의 카드예요. 내일 다시 뽑을 수 있어요';
+  area.appendChild(note);
+}
+// 공유용 이미지 (1080x1350)
+function makeTarotCard(card, mode) {
+  const CW = 1080, CH = 1350, c = document.createElement('canvas'); c.width = CW; c.height = CH;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, CH); grad.addColorStop(0, '#2B2240'); grad.addColorStop(1, '#15112A');
+  g.fillStyle = grad; g.fillRect(0, 0, CW, CH);
+  g.fillStyle = 'rgba(255,213,74,.25)'; const rnd = seeded(card.n * 97 + 5);
+  for (let i = 0; i < 40; i++) star(g, rnd() * CW, rnd() * CH, 3 + rnd() * 6, 4);
+  g.textAlign = 'center'; g.fillStyle = '#FFD54A'; g.font = '56px Jua'; g.fillText('도둑냥 점집', CW / 2, 100);
+  g.fillStyle = '#fff'; g.font = '34px Jua'; g.fillText(`오늘의 카드 · ${TAROT_MODES[mode]}`, CW / 2, 152);
+  g.save(); g.translate(CW / 2 - 170, 190); drawTarotFront(g, card, 340, 556); g.restore();
+  g.fillStyle = '#FFD54A'; g.font = '64px Jua'; g.fillText(card.name, CW / 2, 830);
+  g.fillStyle = '#C9B8EE'; g.font = '36px Jua'; g.fillText(card.key, CW / 2, 882);
+  g.fillStyle = '#fff'; g.font = '36px "Noto Sans KR"';
+  wrapText(g, card[mode], 860).forEach((line, i) => g.fillText(line, CW / 2, 970 + i * 56));
+  g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '26px "Noto Sans KR"'; g.fillText('재미로 보는 오늘의 카드', CW / 2, 1220);
+  g.fillStyle = '#FFD54A'; g.font = '44px Jua'; g.fillText('@doduk_nyang', CW / 2, 1290);
+  return c;
+}
+document.querySelectorAll('#tarot .tabs button').forEach((b) => { b.onclick = () => { tarotMode = b.dataset.mode; renderTarot(); }; });
+document.getElementById('tClose').onclick = () => tarotEl.classList.remove('open');
+tarotBtn.onclick = () => { renderTarot(); tarotEl.classList.add('open'); };
+const nearTent = () => isPlaza() && Math.abs(me.x - TENT.x) < 120 && me.y > TENT.y - 10 && me.y < TENT.y + 110;
+
 // ---------- 광장 주민 (봇 강아지·고양이) ----------
 // 광장이 휑하지 않게 돌아다니는 주민들. 접속자마다 자기 화면에서 따로 움직이고, 접속자 수(N마리)에는 안 셈
 // 이름표에 "주민"이 붙어서 실제 손님과 구분됨. 실제 손님이 많아지면 주민 수를 줄임
@@ -1120,6 +1281,7 @@ function frame(now) {
   if (info.treasure) BOXES.forEach((b, i) => { items.push({ y: b.y, draw: () => drawBox(b, i, t, now) }); tops.push(['box' + i, b.x, b.y - 96]); });
   if (isPlaza() && !LINEUP) {
     items.push({ y: BOOTH.y + 24, draw: () => drawBooth(t) });
+    items.push({ y: TENT.y, draw: () => drawTent(t) });
     items.push({ y: bot.y, draw: () => tops.push(['bot', bot.x, drawBot(t, now)]) });
   }
   for (let i = poops.length - 1; i >= 0; i--) if (Date.now() > poops[i].until) poops.splice(i, 1);
@@ -1154,6 +1316,9 @@ function frame(now) {
   if (!info.photo && boothEl.classList.contains('open')) boothEl.classList.remove('open');
   const canSnap = !!info.photo && !booth.busy && inSpot(me) && Math.hypot(me.tx - me.x, me.ty - me.y) < 2;
   if (canSnap !== snapBtn.classList.contains('show')) snapBtn.classList.toggle('show', canSnap);
+  const canTarot = nearTent() && Math.hypot(me.tx - me.x, me.ty - me.y) < 2;
+  if (canTarot !== tarotBtn.classList.contains('show')) tarotBtn.classList.toggle('show', canTarot);
+  if (!isPlaza() && tarotEl.classList.contains('open')) tarotEl.classList.remove('open');
 
   if (info.treasure) {
     if (openedDay !== dayKey()) loadOpened();   // 자정 지나면 새 상자
