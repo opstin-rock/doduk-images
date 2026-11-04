@@ -61,8 +61,25 @@
   .booth .shoot { width:100%; margin-top:14px; border:0; border-radius:14px; background:var(--red); color:#fff; font-family:"Jua",sans-serif; font-size:20px; padding:12px; cursor:pointer; }
   .music { position:fixed; right:max(12px, calc(50vw - 248px)); top:50px; border:0; font-family:"Noto Sans KR",sans-serif; color:var(--ink); cursor:pointer; font-size:12px; padding:5px 10px; }
   .music.off { opacity:.7; }
-</style>
-</head>
+  .modal .tarot-box { background:#221B38; color:#fff; }
+  .tarot-box .tabs { display:flex; gap:6px; margin-bottom:12px; }
+  .tarot-box .tabs button { flex:1; border:0; border-radius:999px; padding:9px; font-family:"Jua",sans-serif; font-size:15px; background:#3A2F5C; color:#C9B8EE; cursor:pointer; }
+  .tarot-box .tabs button.on { background:var(--yellow); color:var(--ink); }
+  .tarot-hint { text-align:center; font-size:13px; color:#C9B8EE; margin:6px 0 12px; }
+  .tarot-row { display:flex; justify-content:center; gap:10px; perspective:600px; padding-bottom:6px; }
+  .tarot-card { border:0; background:none; padding:0; cursor:pointer; transition:transform .45s ease; }
+  .tarot-card:active { transform:translateY(-4px); }
+  .tarot-card.flip { transform:rotateY(90deg) scale(1.05); }
+  .tarot-card canvas { display:block; border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
+  .tarot-result { display:flex; gap:12px; align-items:flex-start; }
+  .tarot-result canvas { flex:none; border-radius:8px; }
+  .tarot-mode { font-size:12px; color:#C9B8EE; }
+  .tarot-name { font-family:"Jua",sans-serif; font-size:26px; color:var(--yellow); margin:2px 0 6px; }
+  .tarot-name small { font-size:14px; color:#C9B8EE; margin-left:6px; }
+  .tarot-result p { margin:0; font-size:14px; line-height:1.6; }
+  .tarot-box .btns .go { background:var(--yellow); color:var(--ink); }
+  .tarot-box .login { color:#9A8CC0; }
+</style></head>
 <body>
 <canvas id="game"></canvas>
 <div class="top">
@@ -76,6 +93,14 @@
 <div class="phrases" id="phrases"></div>
 <div class="phrases" id="actions"></div>
 <button class="snap" id="snap">꾸미고 찍기</button>
+<button class="snap" id="tarotBtn">타로 보기</button>
+<div class="modal" id="tarot">
+  <div class="box tarot-box">
+    <button class="close" id="tClose" aria-label="닫기">×</button>
+    <div class="tabs"><button data-mode="human">집사 운세</button><button data-mode="pet">우리 애 마음</button></div>
+    <div id="tarotArea"></div>
+  </div>
+</div>
 <div class="booth" id="booth">
   <button class="close" id="bClose" aria-label="닫기">×</button>
   <div class="bt">소품 <small>고르면 다른 친구들한테도 보여</small></div>
@@ -115,9 +140,9 @@
   </div>
   <div class="login">폐쇄몰이라 구경은 그냥 되고, 구매할 때 로그인만 하면 돼</div>
 </div>
-<script src="config.js?v=19"></script>
+<script src="config.js?v=20"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="pets.js?v=19"></script>
-<script src="app.js?v=19"></script>
+<script src="pets.js?v=20"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>
