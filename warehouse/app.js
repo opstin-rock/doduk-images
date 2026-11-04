@@ -1177,3 +1177,45 @@ requestAnimationFrame(frame);
 // ?film=이름 으로 열면 홍보 영상용 연출 스크립트(film.js, 로컬 전용)를 불러옴
 if (location.search.includes('film')) { const s = document.createElement('script'); s.src = 'film.js?' + Date.now(); document.body.appendChild(s); }
 spawnNpcs();
+
+// ---------- 배경음악 ----------
+// 처음 화면을 누르면 켜짐 (브라우저가 소리 자동재생을 막아서). 오른쪽 위 버튼으로 끄고 켬, 설정은 이 브라우저에 기억
+// 곡: "Happy Clappy Loop" by OwlishMedia (CC0, opengameart.org/content/happy-clappy-loop)
+const music = (() => {
+  const btn = document.getElementById('music');
+  let on = true;
+  try { on = localStorage.getItem('doduk-music') !== 'off'; } catch {}
+  if (location.search.includes('film')) on = false;
+  let ac = null, gain = null, started = false, loading = null;
+  const label = () => { btn.textContent = on ? '음악 끄기' : '음악 켜기'; btn.classList.toggle('off', !on); };
+  async function start() {
+    if (started || loading) return loading;
+    loading = (async () => {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      gain = ac.createGain(); gain.gain.value = 0.35; gain.connect(ac.destination);
+      const buf = await ac.decodeAudioData(await (await fetch('music/bgm.m4a')).arrayBuffer());
+      // 압축(AAC)하면서 앞에 생긴 짧은 무음을 건너뛰고 원곡 길이(769132 샘플 @44.1kHz)만큼만 반복 → 이음새 없이 돌게
+      const d = buf.getChannelData(0);
+      let lead = 0; while (lead < 8192 && Math.abs(d[lead]) < 0.001) lead++;
+      const src = ac.createBufferSource(); src.buffer = buf; src.loop = true;
+      src.loopStart = lead / buf.sampleRate; src.loopEnd = Math.min(buf.duration, src.loopStart + 769132 / 44100);
+      src.connect(gain); src.start(0, src.loopStart);
+      started = true;
+      if (!on) await ac.suspend();
+    })().catch(() => { btn.style.display = 'none'; });   // 음악 파일이 없거나 재생이 안 되면 버튼 숨김
+    return loading;
+  }
+  function set(v) {
+    on = v; label();
+    try { localStorage.setItem('doduk-music', on ? 'on' : 'off'); } catch {}
+    if (on) { if (!started) start(); else ac.resume(); } else if (ac) ac.suspend();
+  }
+  btn.onclick = (e) => { e.stopPropagation(); set(!on); };
+  // 첫 터치 때 켜기 (꺼둔 사람은 그대로)
+  const first = () => { if (on) start(); removeEventListener('pointerdown', first, true); };
+  addEventListener('pointerdown', first, true);
+  // 다른 앱으로 가면 소리 멈춤
+  document.addEventListener('visibilitychange', () => { if (!ac || !on) return; document.hidden ? ac.suspend() : ac.resume(); });
+  label();
+  return { set };
+})();
