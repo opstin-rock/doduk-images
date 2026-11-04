@@ -177,6 +177,7 @@ const net = (() => {
       ch.on('broadcast', { event: 'say' }, ({ payload }) => onSay(payload.id, payload.i));
       ch.on('broadcast', { event: 'act' }, ({ payload }) => onAct(payload.id, payload.a, payload.x, payload.y));
       ch.on('broadcast', { event: 'ball' }, ({ payload }) => onBall(payload));
+      ch.on('broadcast', { event: 'snack' }, ({ payload }) => onSnack(payload));
       ch.on('presence', { event: 'sync' }, () => {
         const state = ch.presenceState();
         const ids = new Set(Object.keys(state));
@@ -204,6 +205,7 @@ const net = (() => {
       say(i) { bcast('say', { id: myId, i }); },
       act(a, x, y) { bcast('act', { id: myId, a, x, y }); },
       ball(s) { bcast('ball', s); },
+      snack(s) { bcast('snack', s); },
       send() {
         if (!bcast('move', move())) return;
         clearTimeout(trackTimer);
@@ -218,6 +220,7 @@ const net = (() => {
     else if (d.type === 'say') { if (d.scene === me.scene) onSay(d.id, d.i); }
     else if (d.type === 'act') { if (d.scene === me.scene) onAct(d.id, d.a, d.x, d.y); }
     else if (d.type === 'ball') { if (d.scene === me.scene) onBall(d); }
+    else if (d.type === 'snack') { if (d.scene === me.scene) onSnack(d); }
     else if (d.type === 'move') onMove(d);
     else onPeer(d);
   };
@@ -233,6 +236,7 @@ const net = (() => {
     say(i) { bc.postMessage({ type: 'say', id: myId, scene: me.scene, i }); },
     act(a, x, y) { bc.postMessage({ type: 'act', id: myId, scene: me.scene, a, x, y }); },
     ball(s) { bc.postMessage({ type: 'ball', scene: me.scene, ...s }); },
+    snack(s) { bc.postMessage({ type: 'snack', scene: me.scene, ...s }); },
   };
 })();
 net.send();
@@ -268,6 +272,8 @@ if (location.search.includes('demo')) {
 const phrasesEl = document.getElementById('phrases');
 const actionsEl = document.getElementById('actions');
 let lastSay = 0, lastAct = 0;
+function buildButtons() {
+phrasesEl.innerHTML = ''; actionsEl.innerHTML = '';
 PHRASES.forEach((_, i) => {
   const btn = document.createElement('button');
   btn.textContent = phraseText(i, me.breed);
@@ -293,6 +299,26 @@ ACTIONS.forEach((d) => {
   };
   actionsEl.appendChild(btn);
 });
+}
+buildButtons();
+
+// ---------- 입장: 강아지 / 고양이 고르기 (품종은 그 안에서 랜덤). 왼쪽 위 "나: ..." 누르면 다시 고름 ----------
+const chooserEl = document.getElementById('chooser');
+const meChip = document.getElementById('me');
+function setKind(kind) {
+  const pool = BREEDS.map((b, i) => ({ b, i })).filter(({ b, i }) => (!kind || b.kind === kind) && i !== me.breed);
+  const list = pool.length ? pool : BREEDS.map((b, i) => ({ b, i }));
+  me.breed = list[Math.floor(Math.random() * list.length)].i;
+  meChip.textContent = `나: ${BREEDS[me.breed].name}`;
+  try { localStorage.setItem('doduk-kind', kind || ''); } catch {}
+  buildButtons(); net.send();
+  chooserEl.classList.remove('open');
+  speech.set(myId, { text: phraseText(0, me.breed), until: Date.now() + 1800 });
+}
+chooserEl.querySelectorAll('button[data-kind]').forEach((b) => { b.onclick = () => setKind(b.dataset.kind); });
+meChip.style.cursor = 'pointer';
+meChip.onclick = () => chooserEl.classList.add('open');
+if (!location.search.match(/film|lineup|demo/)) chooserEl.classList.add('open');
 document.getElementById('talk').onclick = () => { phrasesEl.classList.toggle('open'); actionsEl.classList.remove('open'); };
 document.getElementById('act').onclick = () => { actionsEl.classList.toggle('open'); phrasesEl.classList.remove('open'); };
 
@@ -471,7 +497,7 @@ function drawBooth(t) {
   rr(c.x - 80, c.y - 28, 160, 52, 10); ctx.fillStyle = '#6B4A30'; ctx.fill();
   rr(c.x - 80, c.y - 28, 160, 14, 10); ctx.fillStyle = '#8A6343'; ctx.fill();
   if (!bot.home || (bot.say && Date.now() < bot.say.until)) return;   // 도둑냥이 청소하러 나가면 부스는 비어 있음
-  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 소품 쓰고 네컷 찍어 가', '오른쪽 문은 댄스장, 들어가면 다 같이 춤춰', '오른쪽 위 문은 운동장, 공 차러 가자', '오른쪽 아래 천막은 점집, 오늘의 카드 뽑아 봐', '구경은 공짜, 살 때만 로그인'];
+  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 소품 쓰고 네컷 찍어 가', '오른쪽 문은 댄스장, 들어가면 다 같이 춤춰', '오른쪽 위 문은 운동장, 공 차러 가자', '오른쪽 아래 천막은 점집, 오늘의 카드 뽑아 봐', '매시 정각엔 간식 타임, 1분 동안 많이 주워', '구경은 공짜, 살 때만 로그인'];
   const msg = lines[Math.floor(t / 4) % lines.length];
   ctx.font = '18px Jua'; const w = ctx.measureText(msg).width + 24;
   const bx = c.x + 30, by = c.y - 172;
@@ -1154,6 +1180,134 @@ document.getElementById('tClose').onclick = () => tarotEl.classList.remove('open
 tarotBtn.onclick = () => { renderTarot(); tarotEl.classList.add('open'); };
 const nearTent = () => isPlaza() && Math.abs(me.x - TENT.x) < 120 && me.y > TENT.y - 10 && me.y < TENT.y + 110;
 
+// ---------- 간식 타임: 매시 정각부터 1분 동안 광장에 간식이 떨어짐 ----------
+// 간식 위치·시간은 그 시각(한국 시간)으로 정해져서 모두에게 같음. 누가 주웠는지는 실시간으로 알려서 같이 사라짐
+// 주민(봇)도 간식을 주우러 다님 (주민 몫은 각자 화면에서만). 실제 경품 없음
+// 시험: 주소에 ?snacktest 붙이면 3초 뒤 시작
+const SNACK_DUR = 60000, SNACK_COUNT = 70, SNACK_LIFE = 8000, SNACK_FALL = 600;
+const snackTest = location.search.includes('snacktest') ? Date.now() + 3000 : 0;
+let snack = { round: -1, list: [], taken: new Map(), scores: new Map(), result: null };
+function snackClock(now = Date.now()) {
+  if (snackTest) {
+    const into = now - snackTest;
+    return { round: 1, into, active: into >= 0 && into < SNACK_DUR, soon: into < 0, left: -into };
+  }
+  const kst = now + 9 * 3600000;
+  const into = kst % 3600000;
+  return { round: Math.floor(kst / 3600000), into, active: into < SNACK_DUR, soon: 3600000 - into < 120000, left: 3600000 - into };
+}
+function snackReset(round) {
+  const rnd = seeded(round * 7919 + 13);
+  const list = [];
+  for (let i = 0; i < SNACK_COUNT; i++) {
+    let x = 180 + rnd() * 1080, y = 380 + rnd() * 1180;
+    if (Math.hypot(x - FOUNTAIN.x, y - FOUNTAIN.y) < 170) x += x < FOUNTAIN.x ? -180 : 180;
+    list.push({ i, x, y, at: i * ((SNACK_DUR - 9000) / SNACK_COUNT) + rnd() * 500, type: Math.floor(rnd() * 4) });
+  }
+  if (snack.round >= 0 && snack.scores.size && !snack.result) snackFinish();
+  snack = { round, list, taken: new Map(), scores: new Map(), result: null };
+}
+function snackName(id) {
+  const p = who(id);
+  if (!p) return '누군가';
+  return id === myId ? `나 · ${BREEDS[p.breed].name}` : p.npc ? `주민 · ${BREEDS[p.breed].name}` : BREEDS[p.breed].name;
+}
+function takeSnack(i, id) {
+  if (snack.taken.has(i)) return false;
+  snack.taken.set(i, id);
+  snack.scores.set(id, (snack.scores.get(id) || 0) + 1);
+  return true;
+}
+function onSnack(m) {
+  if (m.round !== snack.round) return;
+  takeSnack(m.i, m.id);
+}
+const visibleSnacks = (into) => snack.list.filter((s) => into >= s.at && into < s.at + SNACK_LIFE && !snack.taken.has(s.i));
+function ranking() { return [...snack.scores.entries()].sort((a, b) => b[1] - a[1]); }
+function snackFinish() {
+  const r = ranking();
+  snack.result = { until: Date.now() + 9000, top: r.slice(0, 3).map(([id, n]) => [snackName(id), n]), mine: snack.scores.get(myId) || 0, first: r[0] && r[0][0] === myId };
+  if (snack.result.first && isPlaza()) speech.set(myId, { text: '1등', until: Date.now() + 3000 });
+}
+function snackStep() {
+  const c = snackClock();
+  if (c.active && c.round !== snack.round) snackReset(c.round);
+  if (!c.active && snack.round === c.round && !snack.result && c.into >= SNACK_DUR) snackFinish();
+  if (!c.active || !isPlaza()) return;
+  for (const s of visibleSnacks(c.into)) {
+    if (c.into - s.at < SNACK_FALL) continue;   // 아직 떨어지는 중
+    if (Math.hypot(me.x - s.x, me.y - s.y) < 44) {
+      if (takeSnack(s.i, myId)) { net.snack({ id: myId, i: s.i, round: snack.round }); speech.set(myId, { text: `냠 ${snack.scores.get(myId)}`, until: Date.now() + 700 }); }
+      continue;
+    }
+    for (const [id, p] of activeNpcs()) if (Math.hypot(p.x - s.x, p.y - s.y) < 40) { takeSnack(s.i, id); break; }
+  }
+}
+// 주민이 간식 쪽으로 달려가게 (간식 타임 중이면 true)
+function snackSteer(p, now) {
+  const c = snackClock();
+  if (!c.active || !isPlaza()) return false;
+  if (now < (p.snackNext || 0)) return true;
+  p.snackNext = now + rndIn(500, 1100);
+  let best = null, bd = 700;
+  for (const s of visibleSnacks(c.into)) { const d = Math.hypot(p.x - s.x, p.y - s.y); if (d < bd) { bd = d; best = s; } }
+  if (best) { p.tx = best.x + rndIn(-10, 10); p.ty = best.y + rndIn(-6, 6); p.act = null; }
+  return true;
+}
+function drawSnack(s, into) {
+  const k = Math.min(1, (into - s.at) / SNACK_FALL), fade = Math.min(1, (s.at + SNACK_LIFE - into) / 800);
+  const y = s.y - (1 - k) * (1 - k) * 420;
+  ctx.globalAlpha = fade;
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(s.x, s.y + 4, 16 * k + 4, 5 * k + 2, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.save(); ctx.translate(s.x, y - 10); ctx.rotate(k < 1 ? into / 120 : Math.sin(into / 300 + s.i) * 0.15);
+  ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+  if (s.type === 0) {   // 뼈다귀 과자
+    ctx.fillStyle = '#F2D9A6';
+    ctx.beginPath(); ctx.roundRect(-14, -5, 28, 10, 4); ctx.fill(); ctx.stroke();
+    for (const [x, yy] of [[-15, -5], [-15, 5], [15, -5], [15, 5]]) { ctx.beginPath(); ctx.arc(x, yy, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    ctx.fillRect(-12, -4, 24, 8);
+  } else if (s.type === 1) {   // 생선 과자
+    ctx.fillStyle = '#8FC9E8';
+    ctx.beginPath(); ctx.ellipse(0, 0, 15, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-13, 0); ctx.lineTo(-22, -7); ctx.lineTo(-22, 7); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#2a2420'; ctx.beginPath(); ctx.arc(8, -2, 2, 0, Math.PI * 2); ctx.fill();
+  } else if (s.type === 2) {   // 스틱 간식
+    ctx.fillStyle = '#E8402F';
+    ctx.beginPath(); ctx.roundRect(-5, -15, 10, 30, 4); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.fillRect(-4, -4, 8, 6);
+  } else {   // 쿠키
+    ctx.fillStyle = '#D9A066';
+    ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#6B4A30'; for (const [x, yy] of [[-4, -3], [4, 2], [-2, 5], [5, -5]]) { ctx.beginPath(); ctx.arc(x, yy, 2, 0, Math.PI * 2); ctx.fill(); }
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+// 위쪽 띠: 곧 시작 / 진행 중 / 결과
+const snackBar = document.getElementById('snackBar');
+let snackBarAt = 0, snackBarHtml = '';
+function updateSnackBar() {
+  if (performance.now() - snackBarAt < 250) return;
+  snackBarAt = performance.now();
+  const c = snackClock();
+  let html = '';
+  if (c.active) {
+    const sec = Math.ceil((SNACK_DUR - c.into) / 1000);
+    if (!isPlaza()) html = `<b>간식 타임</b> 광장에서 진행 중 ${sec}초 남음`;
+    else {
+      const top = ranking().slice(0, 3).map(([id, n], k) => `${k + 1}. ${snackName(id)} ${n}`).join(' · ');
+      html = `<b>간식 타임 ${sec}초</b> 내가 주운 간식 ${snack.scores.get(myId) || 0}개${top ? `<br><small>${top}</small>` : ''}`;
+    }
+  } else if (snack.result && Date.now() < snack.result.until) {
+    const top = snack.result.top.map(([n, v], k) => `${k + 1}. ${n} ${v}`).join(' · ');
+    html = `<b>간식 타임 끝</b> 나는 ${snack.result.mine}개${top ? `<br><small>${top}</small>` : ''}`;
+  } else if (c.soon) {
+    const s = Math.ceil(c.left / 1000);
+    html = `<b>곧 간식 타임</b> ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} 뒤 광장에 간식이 떨어져`;
+  }
+  if (html !== snackBarHtml) { snackBarHtml = html; snackBar.innerHTML = html; snackBar.classList.toggle('show', !!html); }
+}
+
 // ---------- 광장 주민 (봇 강아지·고양이) ----------
 // 광장이 휑하지 않게 돌아다니는 주민들. 접속자마다 자기 화면에서 따로 움직이고, 접속자 수(N마리)에는 안 셈
 // 이름표에 "주민"이 붙어서 실제 손님과 구분됨. 실제 손님이 많아지면 주민 수를 줄임
@@ -1201,6 +1355,7 @@ function npcThink(id, p, now) {
 function stepNpcs(dt, now) {
   for (const [id, p] of activeNpcs()) {
     step(p, dt);
+    if (snackSteer(p, now)) continue;
     if (now > p.next) npcThink(id, p, now);
   }
 }
@@ -1244,6 +1399,8 @@ function frame(now) {
   checkDoors();
   if (isPlaza()) stepBot(dt, now);
   if (isPlaza() || isDance()) stepNpcs(dt, now);
+  snackStep();
+  updateSnackBar();
   if (me.scene === 'field') { stepBall(dt); kickCheck(); }
 
   const info = sceneInfo();
@@ -1262,6 +1419,8 @@ function frame(now) {
   if (isPlaza() && !LINEUP) {
     items.push({ y: BOOTH.y + 24, draw: () => drawBooth(t) });
     items.push({ y: TENT.y, draw: () => drawTent(t) });
+    const sc = snackClock();
+    if (sc.active && sc.round === snack.round) for (const s of visibleSnacks(sc.into)) items.push({ y: s.y - 2, draw: () => drawSnack(s, sc.into) });
     items.push({ y: bot.y, draw: () => tops.push(['bot', bot.x, drawBot(t, now)]) });
   }
   for (let i = poops.length - 1; i >= 0; i--) if (Date.now() > poops[i].until) poops.splice(i, 1);
