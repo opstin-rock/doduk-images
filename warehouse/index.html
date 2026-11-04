@@ -50,7 +50,17 @@
   .modal .save { background:var(--ink); color:#fff; }
   .modal #pShare { background:var(--red); color:#fff; }
   .modal .close { top:-40px; right:0; color:#fff; font-size:30px; }
-</style></head>
+  .booth { position:fixed; left:0; right:0; bottom:0; background:#fff; border-radius:20px 20px 0 0; padding:14px 16px 16px; box-shadow:0 -6px 24px rgba(0,0,0,.25); transform:translateY(105%); transition:transform .25s ease; max-width:560px; margin:0 auto; }
+  .booth.open { transform:translateY(0); }
+  .booth .bt { font-family:"Jua",sans-serif; font-size:16px; margin:8px 0 6px; }
+  .booth .bt small { font-family:"Noto Sans KR"; font-size:11px; color:var(--gray); margin-left:4px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chips button { border:1.5px solid #eee; border-radius:999px; background:#fff; font-family:"Jua",sans-serif; font-size:14px; padding:6px 11px; cursor:pointer; color:var(--ink); }
+  .chips button.on { background:var(--yellow); border-color:var(--ink); }
+  .chips button.sw::before { content:""; display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--sw); border:1.5px solid var(--ink); margin-right:5px; vertical-align:-1px; }
+  .booth .shoot { width:100%; margin-top:14px; border:0; border-radius:14px; background:var(--red); color:#fff; font-family:"Jua",sans-serif; font-size:20px; padding:12px; cursor:pointer; }
+</style>
+</head>
 <body>
 <canvas id="game"></canvas>
 <div class="top">
@@ -62,7 +72,18 @@
 <button class="talk act" id="act">행동</button>
 <div class="phrases" id="phrases"></div>
 <div class="phrases" id="actions"></div>
-<button class="snap" id="snap">사진 찍기</button>
+<button class="snap" id="snap">꾸미고 찍기</button>
+<div class="booth" id="booth">
+  <button class="close" id="bClose" aria-label="닫기">×</button>
+  <div class="bt">소품 <small>고르면 다른 친구들한테도 보여</small></div>
+  <div class="chips" id="accChips"></div>
+  <div class="bt">배경</div>
+  <div class="chips" id="themeChips"></div>
+  <div class="bt">컷</div>
+  <div class="chips" id="cutChips"></div>
+  <button class="shoot" id="shoot">찍기</button>
+  <div class="login">3, 2, 1 하고 찍어. 찍는 사이에 자리 옮기거나 행동 버튼 눌러도 돼</div>
+</div>
 <div class="modal" id="photo">
   <div class="box">
     <button class="close" id="pClose" aria-label="닫기">×</button>
@@ -91,9 +112,9 @@
   </div>
   <div class="login">폐쇄몰이라 구경은 그냥 되고, 구매할 때 로그인만 하면 돼</div>
 </div>
-<script src="config.js?v=16"></script>
+<script src="config.js?v=17"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="pets.js?v=16"></script>
-<script src="app.js?v=16"></script>
+<script src="pets.js?v=17"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>
