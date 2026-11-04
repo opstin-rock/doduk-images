@@ -141,7 +141,7 @@ function drawPet(ctx, p, t, mine) {
   const top = p.y - s * (legH + bodyH * 1.3 + headR * 2.1 + (b.ear === 'huge' || b.ear === 'big' || b.ear === 'tuft' ? 14 : 6) + bob + (p.acc === 'party' ? headR * 0.9 : p.acc === 'crown' || p.acc === 'beanie' ? headR * 0.4 : 0));
   if (p.noTag) return top;
   ctx.font = `${mine ? 17 : 15}px Jua`; ctx.textAlign = 'center';
-  const label = mine ? `나 · ${b.name}` : b.name;
+  const label = mine ? `나 · ${b.name}` : p.npc ? `주민 · ${b.name}` : b.name;
   const tw = ctx.measureText(label).width + 16;
   petRR(ctx, p.x - tw / 2, top - 26, tw, 24, 12); ctx.fillStyle = mine ? '#E8402F' : 'rgba(31,31,34,.75)'; ctx.fill();
   ctx.fillStyle = '#fff'; ctx.fillText(label, p.x, top - 8);
