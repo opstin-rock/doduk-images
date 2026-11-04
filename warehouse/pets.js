@@ -138,6 +138,7 @@ function drawPet(ctx, p, t, mine) {
 
   // 이름표 (뒤집지 않고)
   const top = p.y - s * (legH + bodyH * 1.3 + headR * 2.1 + (b.ear === 'huge' || b.ear === 'big' || b.ear === 'tuft' ? 14 : 6) + bob);
+  if (p.noTag) return top;
   ctx.font = `${mine ? 17 : 15}px Jua`; ctx.textAlign = 'center';
   const label = mine ? `나 · ${b.name}` : b.name;
   const tw = ctx.measureText(label).width + 16;
