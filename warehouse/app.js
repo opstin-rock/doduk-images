@@ -35,7 +35,7 @@ resize();
 
 // ---------- 나 ----------
 const myId = Math.random().toString(36).slice(2, 10);
-const me = { id: myId, breed: Math.floor(Math.random() * BREEDS.length), scene: 'hall', x: ENTRY.x, y: ENTRY.y, tx: ENTRY.x, ty: ENTRY.y - 110 };
+const me = { id: myId, breed: Math.floor(Math.random() * BREEDS.length), scene: 'hall', x: ENTRY.x, y: ENTRY.y, tx: ENTRY.x, ty: ENTRY.y };   // 들어오면 입구에 서 있음
 document.getElementById('me').textContent = `오늘의 나: ${BREEDS[me.breed].name}`;
 
 // ---------- 데이터: 홀 타임딜 + 방 8개 ----------
@@ -188,7 +188,7 @@ document.getElementById('talk').onclick = () => phrasesEl.classList.toggle('open
 // ---------- 방 이동 ----------
 function goScene(scene, spawn) {
   me.scene = scene;
-  me.x = me.tx = spawn.x; me.y = spawn.y; me.ty = spawn.y - 60;
+  me.x = me.tx = spawn.x; me.y = me.ty = spawn.y;
   closeCard(true);
   net.join(scene);
   net.send();
