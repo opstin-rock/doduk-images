@@ -68,6 +68,7 @@ function hourPick(room) {
 function sceneInfo() {
   if (isPlaza()) return { title: '도둑냥 광장', items: [], shelves: [] };
   if (!data) return { title: '', items: [], shelves: ROOM_SHELVES };
+  if (me.scene === 'field') return { title: '운동장', items: [], shelves: [], field: true };
   if (me.scene === 'treasure') return { title: '보물창고', items: [], shelves: [], treasure: true };
   if (me.scene === 'photo') return { title: '포토존', items: [], shelves: [], photo: true };
   if (me.scene === 'deal') return { title: '오늘의 타임딜', items: data.hall.items.slice(0, PER_ROOM), shelves: ROOM_SHELVES, deal: true };
@@ -80,6 +81,7 @@ function doors() {
   // 강아지·고양이 카테고리 방 문은 2026-11-04에 뺌 (광장은 노는 곳 + 타임딜 방 + 포토존)
   list.push({ id: 'photo', title: '도둑냥 포토존', side: 'left', x: 30, y: 900 });
   list.push({ id: 'treasure', title: '도둑냥 보물창고', side: 'right', x: PLAZA.w - 30, y: 900 });
+  list.push({ id: 'field', title: '도둑냥 운동장', side: 'right', x: PLAZA.w - 30, y: 480 });
   return list;
 }
 
@@ -93,11 +95,19 @@ function onPeer(p) {
   const cur = peers.get(p.id);
   if (cur) { cur.breed = p.breed; cur.seen = Date.now(); cur.goneAt = 0; return; }   // 이동은 Broadcast가 맡음
   peers.set(p.id, { breed: p.breed, x: p.tx, y: p.ty, tx: p.tx, ty: p.ty, seq: 0, seen: Date.now(), goneAt: 0 });
+  greetNewcomer();
+
+}
+// 운동장에 새 손님이 오면, 먼저 와 있던 사람이 공 위치와 점수를 알려줌 (막 들어온 사람은 공 상태를 모르니 안 보냄)
+function greetNewcomer() {
+  if (me.scene !== 'field' || Date.now() - fieldSince < 2500) return;
+  const asked = Date.now();
+  setTimeout(() => { if (me.scene === 'field' && lastBallMsg < asked) net.ball(ballState()); }, 200 + Math.random() * 600);
 }
 function onMove(m) {
   if (m.id === myId || m.scene !== me.scene) return;
   let cur = peers.get(m.id);
-  if (!cur) { cur = { breed: m.breed, x: m.sx, y: m.sy, seq: 0 }; peers.set(m.id, cur); }
+  if (!cur) { cur = { breed: m.breed, x: m.sx, y: m.sy, seq: 0 }; peers.set(m.id, cur); greetNewcomer(); }
   if (m.seq <= cur.seq) return;   // 늦게 도착한 예전 이동은 무시
   if (Math.hypot(cur.x - m.sx, cur.y - m.sy) > 50) { cur.x = m.sx; cur.y = m.sy; }
   Object.assign(cur, { breed: m.breed, tx: m.tx, ty: m.ty, seq: m.seq, seen: Date.now(), goneAt: 0 });
@@ -163,6 +173,7 @@ const net = (() => {
       ch.on('broadcast', { event: 'move' }, ({ payload }) => onMove(payload));
       ch.on('broadcast', { event: 'say' }, ({ payload }) => onSay(payload.id, payload.i));
       ch.on('broadcast', { event: 'act' }, ({ payload }) => onAct(payload.id, payload.a, payload.x, payload.y));
+      ch.on('broadcast', { event: 'ball' }, ({ payload }) => onBall(payload));
       ch.on('presence', { event: 'sync' }, () => {
         const state = ch.presenceState();
         const ids = new Set(Object.keys(state));
@@ -189,6 +200,7 @@ const net = (() => {
       join,
       say(i) { bcast('say', { id: myId, i }); },
       act(a, x, y) { bcast('act', { id: myId, a, x, y }); },
+      ball(s) { bcast('ball', s); },
       send() {
         if (!bcast('move', move())) return;
         clearTimeout(trackTimer);
@@ -202,6 +214,7 @@ const net = (() => {
     if (d.bye) peers.delete(d.id);
     else if (d.type === 'say') { if (d.scene === me.scene) onSay(d.id, d.i); }
     else if (d.type === 'act') { if (d.scene === me.scene) onAct(d.id, d.a, d.x, d.y); }
+    else if (d.type === 'ball') { if (d.scene === me.scene) onBall(d); }
     else if (d.type === 'move') onMove(d);
     else onPeer(d);
   };
@@ -216,6 +229,7 @@ const net = (() => {
     send() { bc.postMessage({ type: 'move', ...move() }); },
     say(i) { bc.postMessage({ type: 'say', id: myId, scene: me.scene, i }); },
     act(a, x, y) { bc.postMessage({ type: 'act', id: myId, scene: me.scene, a, x, y }); },
+    ball(s) { bc.postMessage({ type: 'ball', scene: me.scene, ...s }); },
   };
 })();
 net.send();
@@ -284,6 +298,7 @@ function goScene(scene, spawn) {
   me.scene = scene;
   me.x = me.tx = spawn.x; me.y = me.ty = spawn.y;
   me.act = null;
+  if (scene === 'field') fieldSince = Date.now();
   closeCard(true);
   net.join(scene);
   net.send();
@@ -451,7 +466,7 @@ function drawBooth(t) {
   rr(c.x - 80, c.y - 28, 160, 52, 10); ctx.fillStyle = '#6B4A30'; ctx.fill();
   rr(c.x - 80, c.y - 28, 160, 14, 10); ctx.fillStyle = '#8A6343'; ctx.fill();
   if (!bot.home || (bot.say && Date.now() < bot.say.until)) return;   // 도둑냥이 청소하러 나가면 부스는 비어 있음
-  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 사진 찍어 가', '오른쪽 문은 보물창고, 내가 숨겨둔 거 찾아봐', '구경은 공짜, 살 때만 로그인'];
+  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 사진 찍어 가', '오른쪽 문은 보물창고, 내가 숨겨둔 거 찾아봐', '오른쪽 위 문은 운동장, 공 차러 가자', '구경은 공짜, 살 때만 로그인'];
   const msg = lines[Math.floor(t / 4) % lines.length];
   ctx.font = '18px Jua'; const w = ctx.measureText(msg).width + 24;
   const bx = c.x + 30, by = c.y - 172;
@@ -509,6 +524,99 @@ function drawActor(p, t, mine) {
     for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(fx, top + 40 + i * 12 - 12); ctx.lineTo(fx + 14 * (p.face ?? 1), top + 34 + i * 16 - 16); ctx.stroke(); }
   }
   return top;
+}
+
+// ---------- 운동장: 공 하나를 모두가 같이 참 ----------
+// 공을 찬 사람이 공의 위치·속도·점수를 보내고, 받은 사람은 그 상태에서 똑같이 굴림
+// 위 골대에 넣으면 멍팀 점수, 아래 골대에 넣으면 냥팀 점수 (팀 구분 없이 아무나 차도 됨)
+const FIELD = { l: 40, r: 680, t: 250, b: 1100 };
+const GOAL = { l: 265, r: 455, depth: 40 };
+const BALL_R = 17;
+const ball = { x: 360, y: 675, vx: 0, vy: 0, spin: 0, dog: 0, cat: 0 };
+let lastBallMsg = 0, lastKick = 0, goalShow = null, fieldSince = 0;
+const ballState = () => ({ x: Math.round(ball.x), y: Math.round(ball.y), vx: Math.round(ball.vx), vy: Math.round(ball.vy), dog: ball.dog, cat: ball.cat });
+function onBall(s) {
+  lastBallMsg = Date.now();
+  if (!Number.isFinite(s.x) || !Number.isFinite(s.y)) return;
+  Object.assign(ball, { x: s.x, y: s.y, vx: s.vx || 0, vy: s.vy || 0, dog: s.dog | 0, cat: s.cat | 0 });
+}
+function resetBall() { ball.x = 360; ball.y = 675; ball.vx = 0; ball.vy = 0; }
+function stepBall(dt) {
+  const f = Math.exp(-1.1 * dt);
+  ball.vx *= f; ball.vy *= f;
+  if (Math.hypot(ball.vx, ball.vy) < 6) { ball.vx = 0; ball.vy = 0; }
+  ball.x += ball.vx * dt; ball.y += ball.vy * dt;
+  ball.spin += Math.hypot(ball.vx, ball.vy) * dt / BALL_R;
+  const inMouth = ball.x > GOAL.l + BALL_R && ball.x < GOAL.r - BALL_R;
+  if (ball.x < FIELD.l + BALL_R) { ball.x = FIELD.l + BALL_R; ball.vx = Math.abs(ball.vx) * 0.8; }
+  if (ball.x > FIELD.r - BALL_R) { ball.x = FIELD.r - BALL_R; ball.vx = -Math.abs(ball.vx) * 0.8; }
+  if (ball.y < FIELD.t + BALL_R && !inMouth) { ball.y = FIELD.t + BALL_R; ball.vy = Math.abs(ball.vy) * 0.8; }
+  if (ball.y > FIELD.b - BALL_R && !inMouth) { ball.y = FIELD.b - BALL_R; ball.vy = -Math.abs(ball.vy) * 0.8; }
+  if (ball.y < FIELD.t - 10) { ball.dog++; goal('멍팀'); }
+  else if (ball.y > FIELD.b + 10) { ball.cat++; goal('냥팀'); }
+}
+function goal(team) {
+  goalShow = { team, until: Date.now() + 1800 };
+  resetBall();
+  if (ball.dog > 99 || ball.cat > 99) { ball.dog = 0; ball.cat = 0; }
+}
+function kickCheck() {
+  const d = Math.hypot(ball.x - me.x, ball.y - me.y);
+  if (d > BALL_R + 24 || performance.now() - lastKick < 300) return;
+  lastKick = performance.now();
+  const moving = Math.hypot(me.tx - me.x, me.ty - me.y) > 2;
+  let nx = (ball.x - me.x) / (d || 1), ny = (ball.y - me.y) / (d || 1);
+  if (d < 1) { nx = me.face ?? 1; ny = 0; }
+  const power = moving ? 560 : 260;
+  ball.vx = nx * power; ball.vy = ny * power;
+  ball.x = me.x + nx * (BALL_R + 25); ball.y = me.y + ny * (BALL_R + 25);
+  net.ball(ballState());
+}
+function drawField() {
+  drawWallAndFloor(ROOM.w, ROOM.h, '#7DB35A', '운동장', '공에 부딪히면 차져 · 위 골대는 멍팀 점수, 아래 골대는 냥팀 점수');
+  // 잔디 줄무늬
+  for (let i = 0; i < 9; i++) if (i % 2) { ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(FIELD.l, FIELD.t + i * ((FIELD.b - FIELD.t) / 9), FIELD.r - FIELD.l, (FIELD.b - FIELD.t) / 9); }
+  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 5;
+  ctx.strokeRect(FIELD.l, FIELD.t, FIELD.r - FIELD.l, FIELD.b - FIELD.t);
+  ctx.beginPath(); ctx.moveTo(FIELD.l, 675); ctx.lineTo(FIELD.r, 675); ctx.stroke();
+  ctx.beginPath(); ctx.arc(360, 675, 90, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeRect(GOAL.l - 50, FIELD.t, GOAL.r - GOAL.l + 100, 110);
+  ctx.strokeRect(GOAL.l - 50, FIELD.b - 110, GOAL.r - GOAL.l + 100, 110);
+  // 골대 (그물)
+  for (const [y0, dir, team] of [[FIELD.t, -1, '멍팀 골'], [FIELD.b, 1, '냥팀 골']]) {
+    const y1 = y0 + dir * GOAL.depth;
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(GOAL.l, Math.min(y0, y1), GOAL.r - GOAL.l, GOAL.depth);
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1.5;
+    for (let x = GOAL.l; x <= GOAL.r; x += 14) { ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke(); }
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(GOAL.l, y0); ctx.lineTo(GOAL.l, y1); ctx.lineTo(GOAL.r, y1); ctx.lineTo(GOAL.r, y0); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = '18px Jua'; ctx.textAlign = 'center'; ctx.fillText(team, 360, y0 + dir * -22 + (dir < 0 ? 6 : 0));
+  }
+  // 점수판
+  rr(560, 40, 140, 96, 12); ctx.fillStyle = '#2B2622'; ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '18px Jua'; ctx.textAlign = 'center'; ctx.fillText('멍팀', 600, 70); ctx.fillText('냥팀', 660, 70);
+  ctx.fillStyle = '#FFD54A'; ctx.font = '38px Jua'; ctx.fillText(String(ball.dog), 600, 118); ctx.fillText(String(ball.cat), 660, 118);
+  rr(EXIT.x - 85, ROOM.h - 46, 170, 36, 10); ctx.fillStyle = '#2B2622'; ctx.fill();
+  ctx.fillStyle = '#FFD54A'; ctx.font = '19px Jua'; ctx.textAlign = 'center'; ctx.fillText('광장으로 나가기', EXIT.x, ROOM.h - 21);
+}
+function drawBall() {
+  ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(ball.x, ball.y + 2, BALL_R, 6, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.save(); ctx.translate(ball.x, ball.y - BALL_R + 2);
+  ctx.beginPath(); ctx.arc(0, 0, BALL_R, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.save(); ctx.clip(); ctx.rotate(ball.spin);
+  ctx.fillStyle = '#2a2420';
+  for (const [x, y] of [[0, 0], [14, -10], [-14, -10], [12, 13], [-12, 13]]) { ctx.beginPath(); ctx.arc(x, y, 5.5, 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(0, 0, BALL_R, 0, Math.PI * 2); ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.restore();
+}
+function drawGoalBanner() {
+  if (!goalShow || Date.now() > goalShow.until) return;
+  const k = 1 - (goalShow.until - Date.now()) / 1800, s = 1 + Math.sin(Math.min(1, k * 4) * Math.PI) * 0.15;
+  ctx.save(); ctx.translate(camX + VIEW_W / 2, camY + viewH * 0.4); ctx.scale(s, s);
+  ctx.font = '88px Jua'; ctx.textAlign = 'center'; ctx.lineWidth = 10; ctx.strokeStyle = '#2a2420';
+  ctx.strokeText('골!', 0, 0); ctx.fillStyle = '#FFD54A'; ctx.fillText('골!', 0, 0);
+  ctx.font = '36px Jua'; ctx.lineWidth = 7; ctx.strokeText(`${goalShow.team} 득점`, 0, 56); ctx.fillStyle = '#fff'; ctx.fillText(`${goalShow.team} 득점`, 0, 56);
+  ctx.restore();
 }
 
 // ---------- 보물창고: 상자 12개 중 3개에 도둑냥이 오늘의 타임딜을 숨겨둠 ----------
@@ -805,6 +913,7 @@ function frame(now) {
   }
   checkDoors();
   if (isPlaza()) stepBot(dt, now);
+  if (me.scene === 'field') { stepBall(dt); kickCheck(); }
 
   const info = sceneInfo();
   const { w, h } = size();
@@ -812,11 +921,12 @@ function frame(now) {
   camY = viewH >= h ? -(viewH - h) / 2 : Math.max(0, Math.min(h - viewH, me.y - viewH * 0.55));
   ctx.setTransform(scale, 0, 0, scale, -camX * scale, -camY * scale);
   ctx.clearRect(camX, camY, VIEW_W, viewH);
-  if (isPlaza()) drawPlaza(t); else if (info.photo) drawPhotoRoom(t); else if (info.treasure) drawTreasureRoom(); else drawRoom(info);
+  if (isPlaza()) drawPlaza(t); else if (info.photo) drawPhotoRoom(t); else if (info.treasure) drawTreasureRoom(); else if (info.field) drawField(); else drawRoom(info);
 
   // 위쪽(y가 작은 것)부터 그려서 앞뒤가 자연스럽게 겹치게
   const tops = [];   // 말풍선을 맨 위에 그리려고 캐릭터 머리 위치를 모아 둠
   const items = info.shelves.map((s, i) => ({ y: s.y + 60, draw: () => drawShelf(s, info.items[i]) }));
+  if (info.field) items.push({ y: ball.y, draw: drawBall });
   if (info.treasure) BOXES.forEach((b, i) => { items.push({ y: b.y, draw: () => drawBox(b, i, t, now) }); tops.push(['box' + i, b.x, b.y - 96]); });
   if (isPlaza() && !LINEUP) {
     items.push({ y: BOOTH.y + 24, draw: () => drawBooth(t) });
@@ -838,6 +948,7 @@ function frame(now) {
     ctx.fillStyle = '#1f1f22'; ctx.fillText(s.text, x, by + 24);
   }
 
+  if (info.field) drawGoalBanner();
   if (performance.now() < flashUntil) {
     ctx.globalAlpha = (flashUntil - performance.now()) / 450; ctx.fillStyle = '#fff';
     ctx.fillRect(camX, camY, VIEW_W, viewH); ctx.globalAlpha = 1;
