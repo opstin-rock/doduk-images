@@ -4,7 +4,7 @@
 // 다른 손님도 실시간으로 보임 (config.js에 Supabase 설정이 있으면 인터넷 전체, 없으면 같은 브라우저 탭끼리만)
 // 캐릭터(BREEDS, drawPet)는 pets.js
 
-const VIEW_W = 720;                // 화면 가로에 보이는 폭 (월드 단위)
+let VIEW_W = 720;                // 화면 가로에 보이는 폭 (월드 단위)
 const SPEED = 190;                 // 걷는 속도 (월드 단위/초)
 const PER_ROOM = 10;
 
@@ -122,7 +122,7 @@ function phraseText(i, breed) {
   if (i === 0) return BREEDS[breed].kind === 'cat' ? '냥' : '멍멍';
   return PHRASES[i] ?? null;
 }
-function who(id) { return id === myId ? me : peers.get(id); }
+function who(id) { return id === myId ? me : peers.get(id) ?? npcs.get(id); }
 function onSay(id, i) {
   const w = who(id);
   const text = w && Number.isInteger(i) ? phraseText(i, w.breed) : null;
@@ -157,7 +157,7 @@ function onAct(id, a, x, y) {
 
 // ---------- 실시간 연결 ----------
 const net = (() => {
-  const cfg = window.DODUK || {};
+  const cfg = location.search.includes('film') ? {} : window.DODUK || {};   // 홍보 영상 촬영(?film)은 실제 손님과 섞이지 않게 혼자 모드
   let seq = 0;
   const presence = () => ({ id: me.id, breed: me.breed, acc: me.acc, scene: me.scene, tx: Math.round(me.tx), ty: Math.round(me.ty), ts: Date.now() });
   const move = () => ({ id: me.id, breed: me.breed, acc: me.acc, scene: me.scene, sx: Math.round(me.x), sy: Math.round(me.y), tx: Math.round(me.tx), ty: Math.round(me.ty), seq: ++seq });
@@ -272,7 +272,7 @@ PHRASES.forEach((_, i) => {
   btn.onclick = () => {
     if (Date.now() - lastSay < 1500) return;   // 도배 방지
     lastSay = Date.now();
-    onSay(myId, i); net.say(i);
+    onSay(myId, i); net.say(i); npcReact('say');
     phrasesEl.classList.remove('open');
   };
   phrasesEl.appendChild(btn);
@@ -286,7 +286,7 @@ ACTIONS.forEach((d) => {
     me.tx = me.x; me.ty = me.y;   // 제자리에서
     const face = me.face ?? 1;
     const px = Math.round(me.x - face * 26), py = Math.round(me.y + 4);
-    onAct(myId, d.a, px, py); net.act(d.a, px, py); net.send();
+    onAct(myId, d.a, px, py); net.act(d.a, px, py); net.send(); npcReact(d.a);
     actionsEl.classList.remove('open');
   };
   actionsEl.appendChild(btn);
@@ -300,6 +300,7 @@ function goScene(scene, spawn) {
   me.x = me.tx = spawn.x; me.y = me.ty = spawn.y;
   me.act = null;
   if (scene === 'field') fieldSince = Date.now();
+  spawnNpcs();
   closeCard(true);
   net.join(scene);
   net.send();
@@ -1020,6 +1021,62 @@ function drawBot(t, now) {
   return bot.y - h - 6;
 }
 
+// ---------- 광장 주민 (봇 강아지·고양이) ----------
+// 광장이 휑하지 않게 돌아다니는 주민들. 접속자마다 자기 화면에서 따로 움직이고, 접속자 수(N마리)에는 안 셈
+// 이름표에 "주민"이 붙어서 실제 손님과 구분됨. 실제 손님이 많아지면 주민 수를 줄임
+const npcs = new Map();
+const NPC_MAX = 8;
+const NPC_OFF = LINEUP || location.search.includes('demo') || location.search.includes('film');
+const NPC_SAY = [0, 1, 2, 4, 6, 7, 8, 9];   // PHRASES 번호 (울음, 이거 싸다, 득템했다, 같이 놀자, 안녕, 배고파, 산책 가자, 다음 방 가자)
+const NPC_ACTS = ['bark', 'jump', 'heart', 'wag', 'roll', 'zoom'];
+const rndIn = (a, b) => a + Math.random() * (b - a);
+function spawnNpcs() {
+  npcs.clear();
+  if (NPC_OFF || !isPlaza()) return;
+  const used = new Set([me.breed]);
+  for (let i = 0; i < NPC_MAX; i++) {
+    let breed; do { breed = Math.floor(Math.random() * BREEDS.length); } while (used.has(breed) && used.size < BREEDS.length);
+    used.add(breed);
+    const acc = Math.random() < 0.35 ? ACCESSORIES[1 + Math.floor(Math.random() * (ACCESSORIES.length - 1))].id : '';
+    const x = rndIn(380, 1060), y = rndIn(780, 1640);   // 처음 들어왔을 때 보이게 입구·가운데 쪽에 모아서 시작
+    npcs.set(`npc${i}`, { npc: true, breed, acc, x, y, tx: x, ty: y, next: performance.now() + rndIn(500, 4000) });
+  }
+}
+function activeNpcs() {
+  const n = Math.max(2, NPC_MAX - peers.size);   // 손님이 늘면 주민은 줄임 (최소 2마리)
+  return [...npcs.entries()].slice(0, n);
+}
+function npcThink(id, p, now) {
+  p.next = now + rndIn(2500, 7000);
+  if (p.act && p.act.a === 'sleep') { if (Math.random() < 0.5) return; p.act = null; }
+  const r = Math.random();
+  if (r < 0.42) { p.tx = Math.max(140, Math.min(1300, p.x + rndIn(-320, 320))); p.ty = Math.max(320, Math.min(1640, p.y + rndIn(-260, 260))); }
+  else if (r < 0.6) onAct(id, NPC_ACTS[Math.floor(Math.random() * NPC_ACTS.length)], p.x, p.y);
+  else if (r < 0.74) speech.set(id, { text: phraseText(NPC_SAY[Math.floor(Math.random() * NPC_SAY.length)], p.breed), until: Date.now() + 2600 });
+  else if (r < 0.84 && Math.hypot(me.x - p.x, me.y - p.y) < 600) { p.tx = me.x + (Math.random() < 0.5 ? -70 : 70); p.ty = me.y + rndIn(-30, 30); }   // 손님한테 다가감
+  else if (r < 0.89) onAct(id, 'sleep', p.x, p.y);
+  else if (r < 0.915) onAct(id, 'poop', Math.round(p.x - (p.face ?? 1) * 26), Math.round(p.y + 4));   // 가끔 싸고 도둑냥이 치움
+}
+function stepNpcs(dt, now) {
+  for (const [id, p] of activeNpcs()) {
+    step(p, dt);
+    if (now > p.next) npcThink(id, p, now);
+  }
+}
+// 내가 말하거나 행동하면 근처 주민이 반응
+function npcReact(kind) {
+  for (const [id, p] of activeNpcs()) {
+    if (Math.hypot(me.x - p.x, me.y - p.y) > 260 || Math.random() < 0.4) continue;
+    setTimeout(() => {
+      if (kind === 'poop' && Math.random() < 0.5) return onAct(id, 'bark', p.x, p.y);
+      if (Math.random() < 0.5) onAct(id, Math.random() < 0.6 ? 'heart' : 'jump', p.x, p.y);
+      else speech.set(id, { text: phraseText([0, 4, 6][Math.floor(Math.random() * 3)], p.breed), until: Date.now() + 2400 });
+      if (p.act && p.act.a === 'sleep') p.act = null;
+      p.next = performance.now() + rndIn(2000, 5000);
+    }, rndIn(500, 1500));
+  }
+}
+
 // ---------- 움직임 + 그리기 루프 ----------
 function step(p, dt) {
   // 우다다: 행동 중엔 원을 그리며 빠르게 뜀
@@ -1044,7 +1101,7 @@ function frame(now) {
     step(p, dt);
   }
   checkDoors();
-  if (isPlaza()) stepBot(dt, now);
+  if (isPlaza()) { stepBot(dt, now); stepNpcs(dt, now); }
   if (me.scene === 'field') { stepBall(dt); kickCheck(); }
 
   const info = sceneInfo();
@@ -1068,6 +1125,7 @@ function frame(now) {
   for (let i = poops.length - 1; i >= 0; i--) if (Date.now() > poops[i].until) poops.splice(i, 1);
   for (const pp of poops) if (pp.scene === me.scene) items.push({ y: pp.y - 1, draw: () => drawPoop(pp, t) });
   for (const [id, p] of peers) items.push({ y: p.y, draw: () => tops.push([id, p.x, drawActor(p, t, false)]) });
+  if (isPlaza()) for (const [id, p] of activeNpcs()) items.push({ y: p.y, draw: () => tops.push([id, p.x, drawActor(p, t, false)]) });
   items.push({ y: me.y, draw: () => tops.push([myId, me.x, drawActor(me, t, true)]) });
   items.sort((a, b) => a.y - b.y).forEach((it) => it.draw());
   for (const [id, x, top] of tops) {
@@ -1115,3 +1173,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+// ?film=이름 으로 열면 홍보 영상용 연출 스크립트(film.js, 로컬 전용)를 불러옴
+if (location.search.includes('film')) { const s = document.createElement('script'); s.src = 'film.js?' + Date.now(); document.body.appendChild(s); }
+spawnNpcs();
