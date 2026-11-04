@@ -91,6 +91,8 @@ function doors() {
 // ---------- 다른 손님 (실시간, 같은 장소에 있는 손님만) ----------
 // Presence(접속자 목록): 누가 들어오고 나갔는지, 품종, 마지막 목표 위치 (늦게 들어온 사람용)
 // Broadcast(즉시 메시지): 이동, 말풍선, 행동
+// extras.js(미니게임·트리 등)가 끼어드는 자리: 광장 그리기, 매 프레임, 실시간 메시지
+const plazaHooks = [], frameHooks = [], extraHandlers = {};
 const peers = new Map();   // id → { breed, x, y, tx, ty, seq, seen, goneAt, act }
 function onPeer(p) {
   if (p.id === myId) return;
@@ -178,6 +180,7 @@ const net = (() => {
       ch.on('broadcast', { event: 'act' }, ({ payload }) => onAct(payload.id, payload.a, payload.x, payload.y));
       ch.on('broadcast', { event: 'ball' }, ({ payload }) => onBall(payload));
       ch.on('broadcast', { event: 'snack' }, ({ payload }) => onSnack(payload));
+      ch.on('broadcast', { event: 'ext' }, ({ payload }) => extraHandlers[payload.k]?.(payload));
       ch.on('presence', { event: 'sync' }, () => {
         const state = ch.presenceState();
         const ids = new Set(Object.keys(state));
@@ -206,6 +209,7 @@ const net = (() => {
       act(a, x, y) { bcast('act', { id: myId, a, x, y }); },
       ball(s) { bcast('ball', s); },
       snack(s) { bcast('snack', s); },
+      ext(k, s) { bcast('ext', { ...s, k }); },
       send() {
         if (!bcast('move', move())) return;
         clearTimeout(trackTimer);
@@ -221,6 +225,7 @@ const net = (() => {
     else if (d.type === 'act') { if (d.scene === me.scene) onAct(d.id, d.a, d.x, d.y); }
     else if (d.type === 'ball') { if (d.scene === me.scene) onBall(d); }
     else if (d.type === 'snack') { if (d.scene === me.scene) onSnack(d); }
+    else if (d.type === 'ext') { if (d.scene === me.scene) extraHandlers[d.k]?.(d); }
     else if (d.type === 'move') onMove(d);
     else onPeer(d);
   };
@@ -237,6 +242,7 @@ const net = (() => {
     act(a, x, y) { bc.postMessage({ type: 'act', id: myId, scene: me.scene, a, x, y }); },
     ball(s) { bc.postMessage({ type: 'ball', scene: me.scene, ...s }); },
     snack(s) { bc.postMessage({ type: 'snack', scene: me.scene, ...s }); },
+    ext(k, s) { bc.postMessage({ type: 'ext', scene: me.scene, ...s, k }); },
   };
 })();
 net.send();
@@ -497,7 +503,7 @@ function drawBooth(t) {
   rr(c.x - 80, c.y - 28, 160, 52, 10); ctx.fillStyle = '#6B4A30'; ctx.fill();
   rr(c.x - 80, c.y - 28, 160, 14, 10); ctx.fillStyle = '#8A6343'; ctx.fill();
   if (!bot.home || (bot.say && Date.now() < bot.say.until)) return;   // 도둑냥이 청소하러 나가면 부스는 비어 있음
-  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 소품 쓰고 네컷 찍어 가', '오른쪽 문은 댄스장, 들어가면 다 같이 춤춰', '오른쪽 위 문은 운동장, 공 차러 가자', '오른쪽 아래 천막은 점집, 오늘의 카드 뽑아 봐', '매시 정각엔 간식 타임, 1분 동안 많이 주워', '구경은 공짜, 살 때만 로그인'];
+  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 소품 쓰고 네컷 찍어 가', '오른쪽 문은 댄스장, 들어가면 다 같이 춤춰', '오른쪽 위 문은 운동장, 공 차러 가자', '오른쪽 아래 천막은 점집, 오늘의 카드 뽑아 봐', '매시 정각엔 간식 타임, 1분 동안 많이 주워', '왼쪽 아래 오락실에서 점프왕 도전해 봐', '오른쪽 위 트리에 장식 하나 달아 줘', '구경은 공짜, 살 때만 로그인'];
   const msg = lines[Math.floor(t / 4) % lines.length];
   ctx.font = '18px Jua'; const w = ctx.measureText(msg).width + 24;
   const bx = c.x + 30, by = c.y - 172;
@@ -1421,6 +1427,7 @@ function frame(now) {
     items.push({ y: TENT.y, draw: () => drawTent(t) });
     const sc = snackClock();
     if (sc.active && sc.round === snack.round) for (const s of visibleSnacks(sc.into)) items.push({ y: s.y - 2, draw: () => drawSnack(s, sc.into) });
+    for (const h of plazaHooks) h(items, t, now);
     items.push({ y: bot.y, draw: () => tops.push(['bot', bot.x, drawBot(t, now)]) });
   }
   for (let i = poops.length - 1; i >= 0; i--) if (Date.now() > poops[i].until) poops.splice(i, 1);
@@ -1458,6 +1465,7 @@ function frame(now) {
   const canTarot = nearTent() && Math.hypot(me.tx - me.x, me.ty - me.y) < 2;
   if (canTarot !== tarotBtn.classList.contains('show')) tarotBtn.classList.toggle('show', canTarot);
   if (!isPlaza() && tarotEl.classList.contains('open')) tarotEl.classList.remove('open');
+  for (const h of frameHooks) h(now);
 
   const n = nearShelf(info.shelves);
   const still = Math.hypot(me.tx - me.x, me.ty - me.y) < 2;
