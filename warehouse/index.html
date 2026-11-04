@@ -41,8 +41,16 @@
   .phrases.open { display:flex; }
   .phrases button { border:0; border-radius:999px; background:var(--cream); font-family:"Jua",sans-serif; font-size:15px; padding:8px 12px; cursor:pointer; }
   .phrases button:first-child { background:var(--yellow); }
-</style>
-</head>
+  .snap { position:fixed; right:max(12px, calc(50vw - 248px)); bottom:16px; border:0; border-radius:999px; background:var(--yellow); color:var(--ink); font-family:"Jua",sans-serif; font-size:18px; padding:11px 20px; box-shadow:0 3px 10px rgba(0,0,0,.3); cursor:pointer; display:none; }
+  .snap.show { display:block; }
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; padding:16px; }
+  .modal.open { display:flex; }
+  .modal .box { position:relative; background:#fff; border-radius:20px; padding:14px; width:min(100%, 420px); }
+  .modal img { width:100%; border-radius:12px; display:block; }
+  .modal .save { background:var(--ink); color:#fff; }
+  .modal #pShare { background:var(--red); color:#fff; }
+  .modal .close { top:-40px; right:0; color:#fff; font-size:30px; }
+</style></head>
 <body>
 <canvas id="game"></canvas>
 <div class="top">
@@ -54,8 +62,19 @@
 <button class="talk act" id="act">행동</button>
 <div class="phrases" id="phrases"></div>
 <div class="phrases" id="actions"></div>
-<div class="sheet" id="sheet">
-  <button class="close" id="close" aria-label="닫기">×</button>
+<button class="snap" id="snap">사진 찍기</button>
+<div class="modal" id="photo">
+  <div class="box">
+    <button class="close" id="pClose" aria-label="닫기">×</button>
+    <img id="pImg" alt="도둑냥 포토존 사진">
+    <div class="btns">
+      <button id="pShare">공유하기</button>
+      <a class="save" id="pSave">저장하기</a>
+    </div>
+    <div class="login">저장이 안 되면 사진을 꾹 눌러서 저장해줘</div>
+  </div>
+</div>
+<div class="sheet" id="sheet">  <button class="close" id="close" aria-label="닫기">×</button>
   <div class="row">
     <img id="sImg" alt="">
     <div>
@@ -72,9 +91,9 @@
   </div>
   <div class="login">폐쇄몰이라 구경은 그냥 되고, 구매할 때 로그인만 하면 돼</div>
 </div>
-<script src="config.js?v=13"></script>
+<script src="config.js?v=14"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="pets.js?v=13"></script>
-<script src="app.js?v=13"></script>
+<script src="pets.js?v=14"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>
