@@ -101,7 +101,7 @@ const net = (() => {
   if (cfg.supabaseUrl && cfg.supabaseKey && window.supabase) {
     // Supabase Realtime presence: 방마다 채널을 따로 열어 그 방 접속자끼리 위치 공유
     const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
-    let ch = null, last = 0, pending = null;
+    let ch = null, last = 0, pending = null, status = 'CONNECTING';
     const join = (scene) => {
       if (ch) { ch.untrack(); client.removeChannel(ch); }
       peers.clear();
@@ -113,11 +113,17 @@ const net = (() => {
         for (const metas of Object.values(state)) onPeer(metas[metas.length - 1]);
         for (const id of [...peers.keys()]) if (!ids.has(id)) peers.delete(id);
       });
-      ch.subscribe((s) => { if (s === 'SUBSCRIBED') ch.track(payload()); });
+      ch.subscribe((s) => { status = s; if (s === 'SUBSCRIBED') ch.track(payload()); });
     };
     join(me.scene);
+    // 폰에서 다른 앱 갔다 오면 연결이 끊겼을 수 있어서, 돌아오면 다시 접속해 위치를 알림
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      if (status === 'SUBSCRIBED') ch.track(payload()); else join(me.scene);
+    });
     return {
       mode: 'online',
+      get status() { return status; },
       join,
       say(i) { ch && ch.send({ type: 'broadcast', event: 'say', payload: { id: myId, i } }); },
       send() {
@@ -371,7 +377,8 @@ function frame(now) {
   if (openShelf >= 0 && n !== openShelf) { sheet.classList.remove('open'); openShelf = -1; }
   if (n !== dismissed) dismissed = -1;   // 닫았던 선반을 벗어나면 다시 열릴 수 있게
 
-  document.getElementById('count').innerHTML = `이 방에 <b>${peers.size + 1}</b>마리${net.mode === 'local' ? ' (테스트)' : ''}`;
+  const conn = net.mode === 'local' ? ' (테스트)' : net.status === 'SUBSCRIBED' ? '' : net.status === 'CONNECTING' ? ' (연결 중)' : ' (연결 끊김, 새로고침)';
+  document.getElementById('count').innerHTML = `이 방에 <b>${peers.size + 1}</b>마리${conn}`;
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
