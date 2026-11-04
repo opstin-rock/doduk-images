@@ -9,7 +9,7 @@
 <style>
   :root { --ink:#1f1f22; --cream:#fbf6ec; --yellow:#ffd54a; --red:#e8402f; --gray:#8a8a8a; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html, body { margin:0; height:100%; background:#2a2622; overflow:hidden; font-family:"Noto Sans KR",sans-serif; color:var(--ink); }
+  html, body { -webkit-text-size-adjust:100%; text-size-adjust:100%; margin:0; height:100%; background:#2a2622; overflow:hidden; font-family:"Noto Sans KR",sans-serif; color:var(--ink); }
   #game { position:fixed; top:0; left:50%; transform:translateX(-50%); width:min(100vw, 520px); height:100%; touch-action:none; display:block; }
   .top { position:fixed; left:max(12px, calc(50vw - 248px)); right:max(12px, calc(50vw - 248px)); top:10px; display:flex; justify-content:space-between; align-items:center; pointer-events:none; }
   .chip { pointer-events:auto; background:rgba(255,255,255,.92); border-radius:999px; padding:6px 12px; font-size:13px; font-weight:700; box-shadow:0 2px 8px rgba(0,0,0,.18); }
@@ -69,9 +69,9 @@
   </div>
   <div class="login">폐쇄몰이라 구경은 그냥 되고, 구매할 때 로그인만 하면 돼</div>
 </div>
-<script src="config.js?v=6"></script>
+<script src="config.js?v=7"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="pets.js?v=6"></script>
-<script src="app.js?v=6"></script>
+<script src="pets.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
