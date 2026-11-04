@@ -134,10 +134,11 @@ function drawPet(ctx, p, t, mine) {
   }
 
   drawHead(ctx, b, hx, hy, headR, headCol, snout, t, p.breed);
+  drawAccessory(ctx, p.acc, hx, hy, headR);
   ctx.restore();
 
   // 이름표 (뒤집지 않고)
-  const top = p.y - s * (legH + bodyH * 1.3 + headR * 2.1 + (b.ear === 'huge' || b.ear === 'big' || b.ear === 'tuft' ? 14 : 6) + bob);
+  const top = p.y - s * (legH + bodyH * 1.3 + headR * 2.1 + (b.ear === 'huge' || b.ear === 'big' || b.ear === 'tuft' ? 14 : 6) + bob + (p.acc === 'party' ? headR * 0.9 : p.acc === 'crown' || p.acc === 'beanie' ? headR * 0.4 : 0));
   if (p.noTag) return top;
   ctx.font = `${mine ? 17 : 15}px Jua`; ctx.textAlign = 'center';
   const label = mine ? `나 · ${b.name}` : b.name;
@@ -292,4 +293,77 @@ function drawHead(ctx, b, hx, hy, headR, headCol, snout, t, seed) {
   ctx.lineWidth = 2.4; ctx.strokeStyle = OUT;
 
   drawEar(ctx, b, hx, hy, headR, 'front');
+}
+
+// ---------- 소품 (포토존에서 고르면 다른 손님에게도 보임) ----------
+const ACCESSORIES = [
+  { id: '', name: '없음' }, { id: 'ribbon', name: '리본' }, { id: 'crown', name: '왕관' }, { id: 'party', name: '꼬깔모자' },
+  { id: 'beanie', name: '비니' }, { id: 'glasses', name: '선글라스' }, { id: 'flower', name: '꽃' }, { id: 'bowtie', name: '나비넥타이' },
+  { id: 'scarf', name: '목도리' }, { id: 'mask', name: '도둑 복면' },
+];
+// 머리 기준(hx, hy, 반지름 R) 좌표. 얼굴이 향하는 쪽이 +x
+function drawAccessory(ctx, acc, hx, hy, R) {
+  if (!acc) return;
+  ctx.save(); ctx.lineWidth = 2; ctx.strokeStyle = OUT; ctx.lineJoin = 'round';
+  const dot = (x, y, r, col) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill(); ctx.stroke(); };
+  const bow = (x, y, w, h, col) => {
+    ctx.fillStyle = col;
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + s * w, y - h); ctx.lineTo(x + s * w, y + h); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+    dot(x, y, h * 0.5, col);
+  };
+  if (acc === 'ribbon') bow(hx - R * 0.45, hy - R * 0.85, R * 0.55, R * 0.32, '#F06A86');
+  if (acc === 'bowtie') bow(hx - R * 0.05, hy + R * 0.92, R * 0.45, R * 0.25, '#E8402F');
+  if (acc === 'crown') {
+    const w = R * 1.1, h = R * 0.62, x = hx + R * 0.1, y = hy - R * 0.72;
+    ctx.beginPath(); ctx.moveTo(x - w / 2, y); ctx.lineTo(x - w / 2, y - h); ctx.lineTo(x - w / 4, y - h * 0.55); ctx.lineTo(x, y - h * 1.05);
+    ctx.lineTo(x + w / 4, y - h * 0.55); ctx.lineTo(x + w / 2, y - h); ctx.lineTo(x + w / 2, y); ctx.closePath();
+    ctx.fillStyle = '#FFD54A'; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#E8402F'; ctx.beginPath(); ctx.arc(x, y - h * 0.32, R * 0.1, 0, Math.PI * 2); ctx.fill();
+  }
+  if (acc === 'party') {
+    const h = R * 1.35, w = R * 0.85;
+    ctx.translate(hx - R * 0.1, hy - R * 0.78); ctx.rotate(-0.25);
+    const cone = () => { ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.lineTo(0, -h); ctx.lineTo(w / 2, 0); ctx.closePath(); };
+    cone(); ctx.fillStyle = '#5BB5E8'; ctx.fill();
+    ctx.save(); cone(); ctx.clip(); ctx.strokeStyle = '#FFD54A'; ctx.lineWidth = R * 0.16;
+    for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(-w, -h * i / 4 + R * 0.2); ctx.lineTo(w, -h * i / 4 - R * 0.2); ctx.stroke(); }
+    ctx.restore(); cone(); ctx.stroke();
+    dot(0, -h, R * 0.18, '#F06A86');
+  }
+  if (acc === 'beanie') {
+    ctx.beginPath(); ctx.ellipse(hx, hy - R * 0.35, R * 1.04, R * 0.78, 0, Math.PI, Math.PI * 2); ctx.closePath(); ctx.fillStyle = '#E8402F'; ctx.fill(); ctx.stroke();
+    petRR(ctx, hx - R * 1.08, hy - R * 0.5, R * 2.16, R * 0.32, R * 0.14); ctx.fillStyle = '#F4E9D8'; ctx.fill(); ctx.stroke();
+    dot(hx, hy - R * 1.18, R * 0.22, '#F4E9D8');
+  }
+  if (acc === 'glasses') {
+    const y = hy - R * 0.12;
+    ctx.fillStyle = '#1f1f22';
+    for (const ex of [hx + R * 0.02, hx + R * 0.5]) { petRR(ctx, ex - R * 0.22, y - R * 0.16, R * 0.44, R * 0.32, R * 0.12); ctx.fill(); }
+    ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(hx + R * 0.22, y - R * 0.06); ctx.lineTo(hx + R * 0.3, y - R * 0.06);
+    ctx.moveTo(hx - R * 0.2, y - R * 0.06); ctx.lineTo(hx - R * 0.78, y - R * 0.14); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.65)'; for (const ex of [hx + R * 0.02, hx + R * 0.5]) ctx.fillRect(ex - R * 0.12, y - R * 0.1, R * 0.07, R * 0.12);
+  }
+  if (acc === 'mask') {
+    ctx.save(); ctx.beginPath(); ctx.ellipse(hx, hy, R, R * 0.93, 0, 0, Math.PI * 2); ctx.clip();
+    ctx.fillStyle = '#26232A'; ctx.fillRect(hx - R * 1.1, hy - R * 0.36, R * 2.2, R * 0.44); ctx.restore();
+    ctx.fillStyle = '#26232A'; ctx.beginPath(); ctx.moveTo(hx - R * 0.95, hy - R * 0.16); ctx.lineTo(hx - R * 1.5, hy - R * 0.42); ctx.lineTo(hx - R * 1.42, hy + R * 0.06); ctx.closePath(); ctx.fill();
+    for (const ex of [hx + R * 0.02, hx + R * 0.5]) {
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex, hy - R * 0.13, R * 0.12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = OUT; ctx.beginPath(); ctx.arc(ex + R * 0.02, hy - R * 0.13, R * 0.065, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  if (acc === 'flower') {
+    const x = hx - R * 0.55, y = hy - R * 0.8;
+    for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; dot(x + Math.cos(a) * R * 0.22, y + Math.sin(a) * R * 0.22, R * 0.18, '#F9A8C0'); }
+    dot(x, y, R * 0.14, '#FFD54A');
+  }
+  if (acc === 'scarf') {
+    const x = hx - R * 0.25, y = hy + R * 0.8;
+    ctx.fillStyle = '#4C8BD9';
+    petRR(ctx, x - R * 0.8, y - R * 0.2, R * 1.6, R * 0.42, R * 0.2); ctx.fill(); ctx.stroke();
+    petRR(ctx, x - R * 0.65, y, R * 0.34, R * 0.85, R * 0.12); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 1.5;
+    for (const dx of [-0.4, 0, 0.4]) { ctx.beginPath(); ctx.moveTo(x + R * dx, y - R * 0.16); ctx.lineTo(x + R * dx, y + R * 0.18); ctx.stroke(); }
+  }
+  ctx.restore();
 }
