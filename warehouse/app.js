@@ -1,5 +1,5 @@
 // 도둑냥 창고: 들어온 사람마다 랜덤 강아지·고양이가 되어 돌아다니며 놀고 구경하는 곳
-// 광장(넓은 홀)은 노는 곳. 위쪽 문은 오늘의 타임딜 방, 양옆 문은 강아지·고양이 사료/간식/영양제/용품 방
+// 광장(넓은 홀)은 노는 곳. 위쪽 빨간 문은 오늘의 타임딜 방
 // 방 진열대는 1시간마다 10개씩 랜덤으로 바뀜 (같은 시간엔 모두가 같은 10개)
 // 다른 손님도 실시간으로 보임 (config.js에 Supabase 설정이 있으면 인터넷 전체, 없으면 같은 브라우저 탭끼리만)
 // 캐릭터(BREEDS, drawPet)는 pets.js
@@ -74,7 +74,7 @@ function sceneInfo() {
 // 광장의 문들 (방 id, 이름, 위치)
 function doors() {
   const list = [{ id: 'deal', title: '오늘의 타임딜', x: DEAL_DOOR.x, y: DEAL_DOOR.y, side: 'top' }];
-  if (data) data.rooms.forEach((r, i) => list.push({ id: r.id, title: r.title, side: r.kind === 'dog' ? 'left' : 'right', x: r.kind === 'dog' ? 30 : PLAZA.w - 30, y: DOOR_YS[i % 4] }));
+  // 강아지·고양이 카테고리 방 문은 2026-11-04에 뺌 (광장은 노는 곳 + 타임딜 방만)
   return list;
 }
 
@@ -446,7 +446,7 @@ function drawBooth(t) {
   rr(c.x - 80, c.y - 28, 160, 52, 10); ctx.fillStyle = '#6B4A30'; ctx.fill();
   rr(c.x - 80, c.y - 28, 160, 14, 10); ctx.fillStyle = '#8A6343'; ctx.fill();
   if (!bot.home || (bot.say && Date.now() < bot.say.until)) return;   // 도둑냥이 청소하러 나가면 부스는 비어 있음
-  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '양옆 문은 강아지·고양이 방', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '구경은 공짜, 살 때만 로그인'];
+  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '구경은 공짜, 살 때만 로그인'];
   const msg = lines[Math.floor(t / 4) % lines.length];
   ctx.font = '18px Jua'; const w = ctx.measureText(msg).width + 24;
   const bx = c.x + 30, by = c.y - 172;
