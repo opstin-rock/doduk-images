@@ -19,6 +19,8 @@ const DOOR_YS = [430, 700, 970, 1240];                   // 광장 양옆 문 �
 const DEAL_DOOR = { x: 720, y: 205 };                    // 광장 위쪽: 오늘의 타임딜 방
 const ROWS = [300, 480, 660, 840, 1020];
 const ROOM_SHELVES = ROWS.flatMap((y) => [{ x: 190, y }, { x: 530, y }]);
+// 타임딜 방은 스레드 글에서 '여기 오면 있다'고 안내하므로 오늘 특가를 전부 진열 (3줄 x 5칸 = 최대 15개, 조금 작게)
+const DEAL_SHELVES = ROWS.flatMap((y) => [{ x: 125, y, k: 0.85 }, { x: 360, y, k: 0.85 }, { x: 595, y, k: 0.85 }]);
 const SPOT = { x: 140, y: 700, w: 440, h: 230 };              // 포토존 발자국 자리
 
 // ---------- 화면 ----------
@@ -72,7 +74,7 @@ function sceneInfo() {
   if (me.scene === 'field') return { title: '운동장', items: [], shelves: [], field: true };
   if (me.scene === 'treasure') return { title: '보물창고', items: [], shelves: [], treasure: true };
   if (me.scene === 'photo') return { title: '포토존', items: [], shelves: [], photo: true };
-  if (me.scene === 'deal') return { title: '오늘의 타임딜', items: data.hall.items.slice(0, PER_ROOM), shelves: ROOM_SHELVES, deal: true };
+  if (me.scene === 'deal') { const items = data.hall.items.slice(0, DEAL_SHELVES.length); return { title: '오늘의 타임딜', items, shelves: DEAL_SHELVES.slice(0, Math.max(1, items.length)), deal: true }; }
   const room = data.rooms.find((r) => r.id === me.scene);
   return { title: room.title, items: hourPick(room), shelves: ROOM_SHELVES, room };
 }
@@ -439,6 +441,7 @@ function drawRoom(info) {
 }
 
 function drawShelf(s, d) {
+  if (s.k) { ctx.save(); ctx.translate(s.x, s.y); ctx.scale(s.k, s.k); ctx.translate(-s.x, -s.y); drawShelf({ x: s.x, y: s.y }, d); ctx.restore(); return; }
   const half = 120, box = 108;
   ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.ellipse(s.x, s.y + 62, half + 6, 15, 0, 0, Math.PI * 2); ctx.fill();
   rr(s.x - half, s.y - 10, half * 2, 70, 8); ctx.fillStyle = '#A8754A'; ctx.fill();
