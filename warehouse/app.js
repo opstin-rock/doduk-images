@@ -77,7 +77,7 @@ function onPeer(p) {
   if (p.id === myId) return;
   if (p.scene !== me.scene) { peers.delete(p.id); return; }
   const cur = peers.get(p.id);
-  if (cur) Object.assign(cur, { breed: p.breed, tx: p.tx, ty: p.ty, seen: Date.now() });
+  if (cur) Object.assign(cur, { breed: p.breed, tx: p.tx, ty: p.ty, seen: Date.now(), goneAt: 0 });
   else peers.set(p.id, { breed: p.breed, x: p.x, y: p.y, tx: p.tx, ty: p.ty, seen: Date.now() });
 }
 
@@ -100,32 +100,34 @@ const net = (() => {
   const payload = () => ({ id: me.id, breed: me.breed, scene: me.scene, x: Math.round(me.x), y: Math.round(me.y), tx: Math.round(me.tx), ty: Math.round(me.ty) });
   if (cfg.supabaseUrl && cfg.supabaseKey && window.supabase) {
     // Supabase Realtime presence: 방마다 채널을 따로 열어 그 방 접속자끼리 위치 공유
-    const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+    // worker: 화면이 뒤로 가도 연결 유지 신호(heartbeat)가 밀리지 않게 별도 작업자에서 보냄
+    const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, { realtime: { worker: true } });
     let ch = null, last = 0, pending = null, status = 'CONNECTING';
     const join = (scene) => {
+      const moving = ch && ch.topic !== `realtime:doduk-${scene}`;
       if (ch) { ch.untrack(); client.removeChannel(ch); }
-      peers.clear();
+      if (moving || !ch) peers.clear();   // 방을 옮길 때만 비움 (같은 방 재접속 때 깜빡이지 않게)
       ch = client.channel(`doduk-${scene}`, { config: { presence: { key: myId } } });
       ch.on('broadcast', { event: 'say' }, ({ payload }) => onSay(payload.id, payload.i));
       ch.on('presence', { event: 'sync' }, () => {
         const state = ch.presenceState();
         const ids = new Set(Object.keys(state));
         for (const metas of Object.values(state)) onPeer(metas[metas.length - 1]);
-        for (const id of [...peers.keys()]) if (!ids.has(id)) peers.delete(id);
+        // 목록에서 빠진 손님은 바로 지우지 않고 8초 기다림 (잠깐 끊겼다 붙는 경우 깜빡임 방지)
+        for (const [id, p] of peers) if (!ids.has(id) && !p.goneAt) p.goneAt = Date.now();
       });
       const mine = ch;
       ch.subscribe((s) => {
         if (mine !== ch) return;   // 방을 옮기며 닫은 예전 채널의 신호는 무시
         status = s;
-        if (s === 'SUBSCRIBED') ch.track(payload());
-        else setTimeout(() => { if (mine === ch && status !== 'SUBSCRIBED') join(me.scene); }, 3000);   // 끊기면 3초 뒤 다시 접속
+        if (s === 'SUBSCRIBED') ch.track(payload());   // 끊겼다 다시 붙으면 Supabase가 알아서 재접속하고 여기로 다시 옴
       });
     };
     join(me.scene);
     // 폰에서 다른 앱 갔다 오면 연결이 끊겼을 수 있어서, 돌아오면 다시 접속해 위치를 알림
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'visible') return;
-      if (status === 'SUBSCRIBED') ch.track(payload()); else join(me.scene);
+      if (status === 'SUBSCRIBED') ch.track(payload());
     });
     return {
       mode: 'online',
@@ -350,7 +352,10 @@ function frame(now) {
   const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
   const t = now / 1000;
   step(me, dt);
-  for (const p of peers.values()) step(p, dt);
+  for (const [id, p] of peers) {
+    if (p.goneAt && Date.now() - p.goneAt > 8000) { peers.delete(id); continue; }
+    step(p, dt);
+  }
   checkDoors();
 
   const info = sceneInfo();
