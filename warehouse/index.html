@@ -59,6 +59,8 @@
   .chips button.on { background:var(--yellow); border-color:var(--ink); }
   .chips button.sw::before { content:""; display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--sw); border:1.5px solid var(--ink); margin-right:5px; vertical-align:-1px; }
   .booth .shoot { width:100%; margin-top:14px; border:0; border-radius:14px; background:var(--red); color:#fff; font-family:"Jua",sans-serif; font-size:20px; padding:12px; cursor:pointer; }
+  .music { position:fixed; right:max(12px, calc(50vw - 248px)); top:50px; border:0; font-family:"Noto Sans KR",sans-serif; color:var(--ink); cursor:pointer; font-size:12px; padding:5px 10px; }
+  .music.off { opacity:.7; }
 </style>
 </head>
 <body>
@@ -67,6 +69,7 @@
   <div class="chip" id="me">들어가는 중</div>
   <div class="chip" id="count">지금 <b>1</b>마리 구경 중</div>
 </div>
+<button class="chip music" id="music">음악 끄기</button>
 <div class="hint" id="hint">바닥을 누르면 걸어가 · 빨간 문은 타임딜</div>
 <button class="talk" id="talk">말풍선</button>
 <button class="talk act" id="act">행동</button>
@@ -112,9 +115,9 @@
   </div>
   <div class="login">폐쇄몰이라 구경은 그냥 되고, 구매할 때 로그인만 하면 돼</div>
 </div>
-<script src="config.js?v=18"></script>
+<script src="config.js?v=19"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="pets.js?v=18"></script>
-<script src="app.js?v=18"></script>
+<script src="pets.js?v=19"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>
