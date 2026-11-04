@@ -19,6 +19,7 @@ const DOOR_YS = [430, 700, 970, 1240];                   // 광장 양옆 문 �
 const DEAL_DOOR = { x: 720, y: 205 };                    // 광장 위쪽: 오늘의 타임딜 방
 const ROWS = [300, 480, 660, 840, 1020];
 const ROOM_SHELVES = ROWS.flatMap((y) => [{ x: 190, y }, { x: 530, y }]);
+const SPOT = { x: 140, y: 700, w: 440, h: 230 };              // 포토존 발자국 자리
 
 // ---------- 화면 ----------
 const canvas = document.getElementById('game');
@@ -67,6 +68,7 @@ function hourPick(room) {
 function sceneInfo() {
   if (isPlaza()) return { title: '도둑냥 광장', items: [], shelves: [] };
   if (!data) return { title: '', items: [], shelves: ROOM_SHELVES };
+  if (me.scene === 'photo') return { title: '포토존', items: [], shelves: [], photo: true };
   if (me.scene === 'deal') return { title: '오늘의 타임딜', items: data.hall.items.slice(0, PER_ROOM), shelves: ROOM_SHELVES, deal: true };
   const room = data.rooms.find((r) => r.id === me.scene);
   return { title: room.title, items: hourPick(room), shelves: ROOM_SHELVES, room };
@@ -74,7 +76,8 @@ function sceneInfo() {
 // 광장의 문들 (방 id, 이름, 위치)
 function doors() {
   const list = [{ id: 'deal', title: '오늘의 타임딜', x: DEAL_DOOR.x, y: DEAL_DOOR.y, side: 'top' }];
-  // 강아지·고양이 카테고리 방 문은 2026-11-04에 뺌 (광장은 노는 곳 + 타임딜 방만)
+  // 강아지·고양이 카테고리 방 문은 2026-11-04에 뺌 (광장은 노는 곳 + 타임딜 방 + 포토존)
+  list.push({ id: 'photo', title: '도둑냥 포토존', side: 'left', x: 30, y: 900 });
   return list;
 }
 
@@ -446,7 +449,7 @@ function drawBooth(t) {
   rr(c.x - 80, c.y - 28, 160, 52, 10); ctx.fillStyle = '#6B4A30'; ctx.fill();
   rr(c.x - 80, c.y - 28, 160, 14, 10); ctx.fillStyle = '#8A6343'; ctx.fill();
   if (!bot.home || (bot.say && Date.now() < bot.say.until)) return;   // 도둑냥이 청소하러 나가면 부스는 비어 있음
-  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '구경은 공짜, 살 때만 로그인'];
+  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 사진 찍어 가', '구경은 공짜, 살 때만 로그인'];
   const msg = lines[Math.floor(t / 4) % lines.length];
   ctx.font = '18px Jua'; const w = ctx.measureText(msg).width + 24;
   const bx = c.x + 30, by = c.y - 172;
@@ -506,11 +509,123 @@ function drawActor(p, t, mine) {
   return top;
 }
 
+// ---------- 포토존 ----------
+const inSpot = (p) => p.x > SPOT.x && p.x < SPOT.x + SPOT.w && p.y > SPOT.y && p.y < SPOT.y + SPOT.h;
+let flashUntil = 0;
+function bunting(g, x0, x1, y, size) {
+  const cols = ['#E8402F', '#FFD54A', '#7B9E6B', '#8FC9E8', '#C57B88'];
+  g.strokeStyle = '#2a2420'; g.lineWidth = size / 10;
+  g.beginPath(); g.moveTo(x0, y); g.quadraticCurveTo((x0 + x1) / 2, y + size * 0.6, x1, y); g.stroke();
+  const n = Math.floor((x1 - x0) / (size * 1.3));
+  for (let i = 0; i < n; i++) {
+    const x = x0 + (i + 0.5) * ((x1 - x0) / n), k = (x - x0) / (x1 - x0), yy = y + Math.sin(k * Math.PI) * size * 0.3;
+    g.beginPath(); g.moveTo(x - size / 2, yy); g.lineTo(x + size / 2, yy); g.lineTo(x, yy + size); g.closePath();
+    g.fillStyle = cols[i % cols.length]; g.fill(); g.stroke();
+  }
+}
+function paw(g, x, y, r, col) {
+  g.fillStyle = col;
+  g.beginPath(); g.ellipse(x, y, r, r * 0.8, 0, 0, Math.PI * 2); g.fill();
+  for (const [dx, dy] of [[-0.9, -1.1], [-0.3, -1.5], [0.3, -1.5], [0.9, -1.1]]) { g.beginPath(); g.arc(x + dx * r, y + dy * r, r * 0.32, 0, Math.PI * 2); g.fill(); }
+}
+function drawPhotoRoom(t) {
+  drawWallAndFloor(ROOM.w, ROOM.h, '#EFE4D4', '포토존', '발자국 위에 서서 찍어봐');
+  rr(50, 220, 620, 440, 26); ctx.fillStyle = '#F3E3C2'; ctx.fill(); ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 4; ctx.stroke();
+  bunting(ctx, 70, 650, 240, 34);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#2B2622'; ctx.font = '58px Jua'; ctx.fillText('도둑냥 광장', 360, 410);
+  ctx.fillStyle = '#E8402F'; ctx.font = '30px Jua'; ctx.fillText('@doduk_nyang', 360, 460);
+  if (doduk.complete && doduk.naturalWidth) { const h = 130, w = (doduk.naturalWidth / doduk.naturalHeight) * h; ctx.drawImage(doduk, 600 - w / 2, 650 - h, w, h); }
+  // 발자국 자리
+  rr(SPOT.x, SPOT.y, SPOT.w, SPOT.h, 30); ctx.fillStyle = 'rgba(255,213,74,.35)'; ctx.fill();
+  ctx.setLineDash([14, 10]); ctx.strokeStyle = '#C9A227'; ctx.lineWidth = 4; ctx.stroke(); ctx.setLineDash([]);
+  for (let i = 0; i < 6; i++) paw(ctx, SPOT.x + 50 + i * 68, SPOT.y + (i % 2 ? 150 : 110), 13, 'rgba(160,120,40,.35)');
+  // 삼각대 카메라
+  const cx = 360, cy = 1060;
+  ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 6;
+  for (const dx of [-50, 0, 50]) { ctx.beginPath(); ctx.moveTo(cx, cy - 40); ctx.lineTo(cx + dx, cy + 60); ctx.stroke(); }
+  rr(cx - 55, cy - 100, 110, 70, 12); ctx.fillStyle = '#3A3530'; ctx.fill(); ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = '#8FC9E8'; ctx.beginPath(); ctx.arc(cx, cy - 65, 22, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = performance.now() < flashUntil || Math.sin(t * 4) > 0.6 ? '#E8402F' : '#6b2a22';
+  ctx.beginPath(); ctx.arc(cx + 38, cy - 90, 5, 0, Math.PI * 2); ctx.fill();
+  rr(EXIT.x - 85, ROOM.h - 46, 170, 36, 10); ctx.fillStyle = '#2B2622'; ctx.fill();
+  ctx.fillStyle = '#FFD54A'; ctx.font = '19px Jua'; ctx.textAlign = 'center'; ctx.fillText('광장으로 나가기', EXIT.x, ROOM.h - 21);
+}
+
+// 사진 카드 (인스타 세로 비율 1080x1350): 발자국 자리에 선 친구들까지 같이 찍힘
+function makeCard() {
+  const CW = 1080, CH = 1350, c = document.createElement('canvas');
+  c.width = CW; c.height = CH;
+  const g = c.getContext('2d');
+  const R = (x, y, w, h, r) => { g.beginPath(); g.roundRect(x, y, w, h, r); };
+  g.fillStyle = '#FBF6EC'; g.fillRect(0, 0, CW, CH);
+  for (let y = 180; y < CH; y += 70) for (let x = (y / 70) % 2 ? 35 : 0; x < CW; x += 70) paw(g, x, y, 8, 'rgba(185,135,90,.10)');
+  g.fillStyle = '#2B2622'; g.fillRect(0, 0, CW, 140);
+  g.textAlign = 'center'; g.fillStyle = '#FFD54A'; g.font = '62px Jua'; g.fillText('도둑냥 광장 포토존', CW / 2, 94);
+  // 액자
+  R(60, 190, 960, 740, 44); g.fillStyle = '#F3E3C2'; g.fill();
+  g.save(); g.clip(); g.fillStyle = '#E9DCC4'; g.fillRect(60, 690, 960, 260); g.restore();
+  R(60, 190, 960, 740, 44); g.strokeStyle = '#2a2420'; g.lineWidth = 8; g.stroke();
+  bunting(g, 90, 990, 215, 52);
+  g.fillStyle = 'rgba(43,38,34,.12)'; g.font = '96px Jua'; g.fillText('도둑냥 광장', CW / 2, 420);
+  // 친구들 (발자국 자리에 선 손님만, 최대 6마리)
+  const now = performance.now() / 1000;
+  const group = [me, ...[...peers.values()].filter(inSpot)].slice(0, 6).sort((a, b) => a.y - b.y);
+  const k = group.length > 3 ? 2.7 : 3.3;
+  for (const p of group) {
+    const x = Math.max(170, Math.min(910, CW / 2 + (p.x - (SPOT.x + SPOT.w / 2)) * 2.3));
+    const y = 830 + (p.y - (SPOT.y + SPOT.h / 2)) * 0.6;
+    g.save(); g.translate(x, y); g.scale(k, k);
+    drawPet(g, { breed: p.breed, x: 0, y: 0, tx: 0, ty: 0, face: p.face ?? 1, noTag: true }, now, false);
+    g.restore();
+    const name = BREEDS[p.breed].name;
+    g.font = '30px Jua'; const w = g.measureText(name).width + 28;
+    R(x - w / 2, y + 22, w, 44, 22); g.fillStyle = p === me ? '#E8402F' : 'rgba(31,31,34,.8)'; g.fill();
+    g.fillStyle = '#fff'; g.fillText(name, x, y + 55);
+  }
+  // 문구
+  const b = BREEDS[me.breed], d = new Date();
+  g.fillStyle = '#1f1f22'; g.font = '44px Jua';
+  g.fillText(group.length > 1 ? `친구 ${group.length - 1}마리랑 같이 찍었어` : '오늘 나는', CW / 2, 1010);
+  g.font = '92px Jua'; g.fillStyle = '#E8402F'; g.fillText(b.name, CW / 2, 1110);
+  g.font = '30px "Noto Sans KR"'; g.fillStyle = '#8a8a8a'; g.fillText(`${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`, CW / 2, 1160);
+  // 아래 띠
+  g.fillStyle = '#2B2622'; g.fillRect(0, 1210, CW, 140);
+  g.textAlign = 'left'; g.fillStyle = '#FFD54A'; g.font = '54px Jua'; g.fillText('@doduk_nyang', 60, 1290);
+  g.fillStyle = '#fff'; g.font = '28px "Noto Sans KR"'; g.fillText('도둑냥 창고에서 찍음 · 들어올 때마다 다른 동물', 60, 1328);
+  if (doduk.complete && doduk.naturalWidth) { const h = 210, w = (doduk.naturalWidth / doduk.naturalHeight) * h; g.drawImage(doduk, CW - w - 30, 1345 - h, w, h); }
+  return c;
+}
+const snapBtn = document.getElementById('snap');
+const photoEl = document.getElementById('photo');
+let photoBlob = null, photoUrl = null;
+snapBtn.onclick = () => {
+  flashUntil = performance.now() + 450;
+  speech.set(myId, { text: '찰칵', until: Date.now() + 1500 });
+  setTimeout(() => {
+    makeCard().toBlob((blob) => {
+      photoBlob = blob;
+      if (photoUrl) URL.revokeObjectURL(photoUrl);
+      photoUrl = URL.createObjectURL(blob);
+      document.getElementById('pImg').src = photoUrl;
+      const save = document.getElementById('pSave');
+      save.href = photoUrl; save.download = `doduk-${BREEDS[me.breed].name}.png`;
+      const file = new File([blob], 'doduk.png', { type: 'image/png' });
+      document.getElementById('pShare').style.display = navigator.canShare && navigator.canShare({ files: [file] }) ? '' : 'none';
+      photoEl.classList.add('open');
+    }, 'image/png');
+  }, 300);
+};
+document.getElementById('pShare').onclick = () => {
+  const file = new File([photoBlob], 'doduk.png', { type: 'image/png' });
+  navigator.share({ files: [file], text: '도둑냥 창고에서 찍었어 @doduk_nyang' }).catch(() => {});
+};
+document.getElementById('pClose').onclick = () => photoEl.classList.remove('open');
+
 // ---------- 도둑냥 청소 봇: 광장에 똥이 생기면 가서 치우고 부스로 돌아옴 ----------
 // 접속한 사람마다 자기 화면에서 따로 움직임 (똥이 생기는 시점이 거의 같아서 비슷하게 보임)
 const HOME = { x: BOOTH.x, y: BOOTH.y - 30 };
 const bot = { x: HOME.x, y: HOME.y, tx: HOME.x, ty: HOME.y, home: true, target: null, cleanUntil: 0, idleSince: performance.now(), say: null, sparkles: [] };
-const SPOT = ['또 쌌어?', '잠깐, 내가 치울게', '거기 그대로 있어', '누구야 이거', '아 진짜'];
+const SPOT_LINES = ['또 쌌어?', '잠깐, 내가 치울게', '거기 그대로 있어', '누구야 이거', '아 진짜'];
 const DONE = ['깨끗해졌다', '다음엔 화장실 가', '반짝반짝', '치우는 것도 일이야', '이건 못 훔치겠다'];
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 function botSay(text) { bot.say = { text, until: Date.now() + 2600 }; }
@@ -534,7 +649,7 @@ function stepBot(dt, now) {
     }
     if (best) {
       bot.target = best; bot.tx = best.x + 34; bot.ty = best.y + 6;
-      if (bot.home || !bot.say || Date.now() > bot.say.until) botSay(pick(SPOT));
+      if (bot.home || !bot.say || Date.now() > bot.say.until) botSay(pick(SPOT_LINES));
     } else if (bot.home && now - bot.idleSince > 15000 && Math.random() < 0.004) {
       // 한가하면 가끔 광장 한 바퀴
       bot.tx = 200 + Math.random() * 1040; bot.ty = 330 + Math.random() * 1100;
@@ -619,7 +734,7 @@ function frame(now) {
   camY = viewH >= h ? -(viewH - h) / 2 : Math.max(0, Math.min(h - viewH, me.y - viewH * 0.55));
   ctx.setTransform(scale, 0, 0, scale, -camX * scale, -camY * scale);
   ctx.clearRect(camX, camY, VIEW_W, viewH);
-  if (isPlaza()) drawPlaza(t); else drawRoom(info);
+  if (isPlaza()) drawPlaza(t); else if (info.photo) drawPhotoRoom(t); else drawRoom(info);
 
   // 위쪽(y가 작은 것)부터 그려서 앞뒤가 자연스럽게 겹치게
   const tops = [];   // 말풍선을 맨 위에 그리려고 캐릭터 머리 위치를 모아 둠
@@ -643,6 +758,13 @@ function frame(now) {
     ctx.beginPath(); ctx.moveTo(x - 6, by + 33); ctx.lineTo(x, by + 42); ctx.lineTo(x + 6, by + 33); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#1f1f22'; ctx.fillText(s.text, x, by + 24);
   }
+
+  if (performance.now() < flashUntil) {
+    ctx.globalAlpha = (flashUntil - performance.now()) / 450; ctx.fillStyle = '#fff';
+    ctx.fillRect(camX, camY, VIEW_W, viewH); ctx.globalAlpha = 1;
+  }
+  const canSnap = !!info.photo && inSpot(me) && Math.hypot(me.tx - me.x, me.ty - me.y) < 2;
+  if (canSnap !== snapBtn.classList.contains('show')) snapBtn.classList.toggle('show', canSnap);
 
   const n = nearShelf(info.shelves);
   const still = Math.hypot(me.tx - me.x, me.ty - me.y) < 2;
