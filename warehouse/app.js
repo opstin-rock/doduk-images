@@ -23,10 +23,11 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 let dpr = 1, scale = 1, viewH = H, camY = 0;
 function resize() {
+  // PC에서는 화면 가운데 폰 크기(최대 520px)로만 그림
   dpr = window.devicePixelRatio || 1;
-  canvas.width = innerWidth * dpr;
+  canvas.width = canvas.clientWidth * dpr;
   canvas.height = innerHeight * dpr;
-  scale = (innerWidth / W) * dpr;
+  scale = (canvas.clientWidth / W) * dpr;
   viewH = canvas.height / scale;
 }
 addEventListener('resize', resize);
@@ -207,8 +208,8 @@ function checkDoors() {
 // ---------- 조작: 바닥을 누르면 그쪽으로 걸어감 ----------
 const hint = document.getElementById('hint');
 canvas.addEventListener('pointerdown', (e) => {
-  const wx = (e.clientX * dpr) / scale;
-  const wy = (e.clientY * dpr) / scale + camY;
+  const wx = (e.offsetX * dpr) / scale;
+  const wy = (e.offsetY * dpr) / scale + camY;
   me.tx = Math.max(24, Math.min(W - 24, wx));
   me.ty = Math.max(200, Math.min(H - 14, wy));
   net.send();
