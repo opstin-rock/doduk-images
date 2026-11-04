@@ -445,11 +445,8 @@ function drawBooth(t) {
   const c = BOOTH;
   rr(c.x - 80, c.y - 28, 160, 52, 10); ctx.fillStyle = '#6B4A30'; ctx.fill();
   rr(c.x - 80, c.y - 28, 160, 14, 10); ctx.fillStyle = '#8A6343'; ctx.fill();
-  if (doduk.complete && doduk.naturalWidth) {
-    const h = 110, w = (doduk.naturalWidth / doduk.naturalHeight) * h;
-    ctx.drawImage(doduk, c.x - w / 2, c.y - 30 - h + Math.sin(t * 3) * 2, w, h);
-  }
-  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '양옆 문은 강아지·고양이 방', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '구경은 공짜, 살 때만 로그인'];
+  if (!bot.home || (bot.say && Date.now() < bot.say.until)) return;   // 도둑냥이 청소하러 나가면 부스는 비어 있음
+  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '양옆 문은 강아지·고양이 방', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '구경은 공짜, 살 때만 로그인'];
   const msg = lines[Math.floor(t / 4) % lines.length];
   ctx.font = '18px Jua'; const w = ctx.measureText(msg).width + 24;
   const bx = c.x + 30, by = c.y - 172;
@@ -509,6 +506,87 @@ function drawActor(p, t, mine) {
   return top;
 }
 
+// ---------- 도둑냥 청소 봇: 광장에 똥이 생기면 가서 치우고 부스로 돌아옴 ----------
+// 접속한 사람마다 자기 화면에서 따로 움직임 (똥이 생기는 시점이 거의 같아서 비슷하게 보임)
+const HOME = { x: BOOTH.x, y: BOOTH.y - 30 };
+const bot = { x: HOME.x, y: HOME.y, tx: HOME.x, ty: HOME.y, home: true, target: null, cleanUntil: 0, idleSince: performance.now(), say: null, sparkles: [] };
+const SPOT = ['또 쌌어?', '잠깐, 내가 치울게', '거기 그대로 있어', '누구야 이거', '아 진짜'];
+const DONE = ['깨끗해졌다', '다음엔 화장실 가', '반짝반짝', '치우는 것도 일이야', '이건 못 훔치겠다'];
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+function botSay(text) { bot.say = { text, until: Date.now() + 2600 }; }
+function stepBot(dt, now) {
+  if (bot.cleanUntil) {
+    if (now < bot.cleanUntil) return;
+    const i = poops.indexOf(bot.target);
+    if (i >= 0) poops.splice(i, 1);
+    for (let k = 0; k < 6; k++) bot.sparkles.push({ x: bot.target.x, y: bot.target.y - 10, a: (k / 6) * Math.PI * 2, start: now });
+    botSay(pick(DONE));
+    bot.cleanUntil = 0; bot.target = null;
+    bot.tx = HOME.x; bot.ty = HOME.y;
+  }
+  if (!bot.target) {
+    // 가장 가까운 똥부터
+    let best = null, bd = Infinity;
+    for (const p of poops) {
+      if (p.scene !== 'hall' || p.until - Date.now() < 1500) continue;
+      const d = Math.hypot(p.x - bot.x, p.y - bot.y);
+      if (d < bd) { bd = d; best = p; }
+    }
+    if (best) {
+      bot.target = best; bot.tx = best.x + 34; bot.ty = best.y + 6;
+      if (bot.home || !bot.say || Date.now() > bot.say.until) botSay(pick(SPOT));
+    } else if (bot.home && now - bot.idleSince > 15000 && Math.random() < 0.004) {
+      // 한가하면 가끔 광장 한 바퀴
+      bot.tx = 200 + Math.random() * 1040; bot.ty = 330 + Math.random() * 1100;
+    }
+  } else if (!poops.includes(bot.target)) {   // 사라진 똥이면 다른 똥 찾기
+    bot.target = null; return;
+  }
+  const dx = bot.tx - bot.x, dy = bot.ty - bot.y, d = Math.hypot(dx, dy);
+  bot.walking = d > 2;
+  if (bot.walking) {
+    const m = Math.min(d, 230 * dt);
+    bot.x += (dx / d) * m; bot.y += (dy / d) * m;
+    bot.home = false;
+    return;
+  }
+  if (bot.target) { bot.cleanUntil = now + 1700; return; }
+  if (bot.x === HOME.x && bot.y === HOME.y) { if (!bot.home) { bot.home = true; bot.idleSince = now; } }
+  else { bot.tx = HOME.x; bot.ty = HOME.y; }
+}
+function drawBot(t, now) {
+  const h = 104, w = doduk.naturalWidth ? (doduk.naturalWidth / doduk.naturalHeight) * h : 0;
+  const cleaning = bot.cleanUntil > now;
+  ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(bot.x, bot.y, 34, 10, 0, 0, Math.PI * 2); ctx.fill();
+  // 빗자루 (청소하러 다닐 때만)
+  if (!bot.home) {
+    const swing = cleaning ? Math.sin(t * 18) * 0.5 : Math.sin(t * 8) * 0.1;
+    ctx.save(); ctx.translate(bot.x - 30, bot.y - 50); ctx.rotate(-0.5 + swing);
+    ctx.fillStyle = '#8A5C37'; ctx.fillRect(-3, 0, 6, 62);
+    ctx.beginPath(); ctx.moveTo(-14, 60); ctx.lineTo(14, 60); ctx.lineTo(18, 82); ctx.lineTo(-18, 82); ctx.closePath();
+    ctx.fillStyle = '#E8C46A'; ctx.fill(); ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.restore();
+  }
+  if (w) {
+    const bob = bot.walking ? -Math.abs(Math.sin(t * 12)) * 7 : Math.sin(t * 3) * 2;
+    ctx.save(); ctx.translate(bot.x, bot.y + bob);
+    if (bot.walking) ctx.rotate(Math.sin(t * 12) * 0.06);
+    ctx.drawImage(doduk, -w / 2, -h, w, h);
+    ctx.restore();
+  }
+  label('도둑냥', bot.x, bot.y + 26, '#2B2622', '#FFD54A', '16px Jua');
+  // 반짝이
+  ctx.fillStyle = '#FFD54A';
+  bot.sparkles = bot.sparkles.filter((s) => now - s.start < 700);
+  for (const s of bot.sparkles) {
+    const k = (now - s.start) / 700, r = 10 + k * 34;
+    ctx.globalAlpha = 1 - k;
+    ctx.beginPath(); ctx.arc(s.x + Math.cos(s.a) * r, s.y + Math.sin(s.a) * r * 0.6, 5, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  return bot.y - h - 6;
+}
+
 // ---------- 움직임 + 그리기 루프 ----------
 function step(p, dt) {
   // 우다다: 행동 중엔 원을 그리며 빠르게 뜀
@@ -533,6 +611,7 @@ function frame(now) {
     step(p, dt);
   }
   checkDoors();
+  if (isPlaza()) stepBot(dt, now);
 
   const info = sceneInfo();
   const { w, h } = size();
@@ -543,18 +622,21 @@ function frame(now) {
   if (isPlaza()) drawPlaza(t); else drawRoom(info);
 
   // 위쪽(y가 작은 것)부터 그려서 앞뒤가 자연스럽게 겹치게
+  const tops = [];   // 말풍선을 맨 위에 그리려고 캐릭터 머리 위치를 모아 둠
   const items = info.shelves.map((s, i) => ({ y: s.y + 60, draw: () => drawShelf(s, info.items[i]) }));
-  if (isPlaza() && !LINEUP) items.push({ y: BOOTH.y + 24, draw: () => drawBooth(t) });
+  if (isPlaza() && !LINEUP) {
+    items.push({ y: BOOTH.y + 24, draw: () => drawBooth(t) });
+    items.push({ y: bot.y, draw: () => tops.push(['bot', bot.x, drawBot(t, now)]) });
+  }
   for (let i = poops.length - 1; i >= 0; i--) if (Date.now() > poops[i].until) poops.splice(i, 1);
   for (const pp of poops) if (pp.scene === me.scene) items.push({ y: pp.y - 1, draw: () => drawPoop(pp, t) });
-  const tops = [];   // 말풍선을 맨 위에 그리려고 캐릭터 머리 위치를 모아 둠
   for (const [id, p] of peers) items.push({ y: p.y, draw: () => tops.push([id, p.x, drawActor(p, t, false)]) });
   items.push({ y: me.y, draw: () => tops.push([myId, me.x, drawActor(me, t, true)]) });
   items.sort((a, b) => a.y - b.y).forEach((it) => it.draw());
   for (const [id, x, top] of tops) {
-    const s = speech.get(id);
+    const s = id === 'bot' ? bot.say : speech.get(id);
     if (!s) continue;
-    if (Date.now() > s.until) { speech.delete(id); continue; }
+    if (Date.now() > s.until) { if (id !== 'bot') speech.delete(id); continue; }
     ctx.font = '20px Jua'; ctx.textAlign = 'center';
     const bw = ctx.measureText(s.text).width + 24, by = top - 40;
     rr(x - bw / 2, by, bw, 34, 14); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#1f1f22'; ctx.lineWidth = 3; ctx.stroke();
