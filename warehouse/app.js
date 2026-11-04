@@ -36,7 +36,7 @@ resize();
 // ---------- 나 ----------
 const myId = Math.random().toString(36).slice(2, 10);
 const me = { id: myId, breed: Math.floor(Math.random() * BREEDS.length), scene: 'hall', x: ENTRY.x, y: ENTRY.y, tx: ENTRY.x, ty: ENTRY.y };   // 들어오면 입구에 서 있음
-document.getElementById('me').textContent = `오늘의 나: ${BREEDS[me.breed].name}`;
+document.getElementById('me').textContent = `나: ${BREEDS[me.breed].name}`;
 
 // ---------- 데이터: 홀 타임딜 + 방 8개 ----------
 let data = null;
@@ -113,7 +113,13 @@ const net = (() => {
         for (const metas of Object.values(state)) onPeer(metas[metas.length - 1]);
         for (const id of [...peers.keys()]) if (!ids.has(id)) peers.delete(id);
       });
-      ch.subscribe((s) => { status = s; if (s === 'SUBSCRIBED') ch.track(payload()); });
+      const mine = ch;
+      ch.subscribe((s) => {
+        if (mine !== ch) return;   // 방을 옮기며 닫은 예전 채널의 신호는 무시
+        status = s;
+        if (s === 'SUBSCRIBED') ch.track(payload());
+        else setTimeout(() => { if (mine === ch && status !== 'SUBSCRIBED') join(me.scene); }, 3000);   // 끊기면 3초 뒤 다시 접속
+      });
     };
     join(me.scene);
     // 폰에서 다른 앱 갔다 오면 연결이 끊겼을 수 있어서, 돌아오면 다시 접속해 위치를 알림
@@ -377,8 +383,8 @@ function frame(now) {
   if (openShelf >= 0 && n !== openShelf) { sheet.classList.remove('open'); openShelf = -1; }
   if (n !== dismissed) dismissed = -1;   // 닫았던 선반을 벗어나면 다시 열릴 수 있게
 
-  const conn = net.mode === 'local' ? ' (테스트)' : net.status === 'SUBSCRIBED' ? '' : net.status === 'CONNECTING' ? ' (연결 중)' : ' (연결 끊김, 새로고침)';
-  document.getElementById('count').innerHTML = `이 방에 <b>${peers.size + 1}</b>마리${conn}`;
+  const conn = net.mode === 'local' ? ' · 테스트' : net.status === 'SUBSCRIBED' ? '' : net.status === 'CONNECTING' ? ' · 연결 중' : ' · 끊김';
+  document.getElementById('count').innerHTML = `<b>${peers.size + 1}</b>마리${conn}`;
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
