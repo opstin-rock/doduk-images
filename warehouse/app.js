@@ -68,6 +68,7 @@ function hourPick(room) {
 function sceneInfo() {
   if (isPlaza()) return { title: '도둑냥 광장', items: [], shelves: [] };
   if (!data) return { title: '', items: [], shelves: ROOM_SHELVES };
+  if (me.scene === 'treasure') return { title: '보물창고', items: [], shelves: [], treasure: true };
   if (me.scene === 'photo') return { title: '포토존', items: [], shelves: [], photo: true };
   if (me.scene === 'deal') return { title: '오늘의 타임딜', items: data.hall.items.slice(0, PER_ROOM), shelves: ROOM_SHELVES, deal: true };
   const room = data.rooms.find((r) => r.id === me.scene);
@@ -78,6 +79,7 @@ function doors() {
   const list = [{ id: 'deal', title: '오늘의 타임딜', x: DEAL_DOOR.x, y: DEAL_DOOR.y, side: 'top' }];
   // 강아지·고양이 카테고리 방 문은 2026-11-04에 뺌 (광장은 노는 곳 + 타임딜 방 + 포토존)
   list.push({ id: 'photo', title: '도둑냥 포토존', side: 'left', x: 30, y: 900 });
+  list.push({ id: 'treasure', title: '도둑냥 보물창고', side: 'right', x: PLAZA.w - 30, y: 900 });
   return list;
 }
 
@@ -449,7 +451,7 @@ function drawBooth(t) {
   rr(c.x - 80, c.y - 28, 160, 52, 10); ctx.fillStyle = '#6B4A30'; ctx.fill();
   rr(c.x - 80, c.y - 28, 160, 14, 10); ctx.fillStyle = '#8A6343'; ctx.fill();
   if (!bot.home || (bot.say && Date.now() < bot.say.until)) return;   // 도둑냥이 청소하러 나가면 부스는 비어 있음
-  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 사진 찍어 가', '구경은 공짜, 살 때만 로그인'];
+  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 사진 찍어 가', '오른쪽 문은 보물창고, 내가 숨겨둔 거 찾아봐', '구경은 공짜, 살 때만 로그인'];
   const msg = lines[Math.floor(t / 4) % lines.length];
   ctx.font = '18px Jua'; const w = ctx.measureText(msg).width + 24;
   const bx = c.x + 30, by = c.y - 172;
@@ -509,8 +511,84 @@ function drawActor(p, t, mine) {
   return top;
 }
 
-// ---------- 포토존 ----------
-const inSpot = (p) => p.x > SPOT.x && p.x < SPOT.x + SPOT.w && p.y > SPOT.y && p.y < SPOT.y + SPOT.h;
+// ---------- 보물창고: 상자 12개 중 3개에 도둑냥이 오늘의 타임딜을 숨겨둠 ----------
+// 하루(한국 시간) 단위로 숨긴 자리가 바뀌고, 모두에게 같은 자리. 연 상자는 이 브라우저에 오늘 하루 기억
+const BOXES = [360, 540, 720, 900].flatMap((y, r) => [150, 360, 570].map((x, j) => ({ x: x + [[-10, 20, 5], [15, -15, 0], [0, 10, -20], [-15, 5, 15]][r][j], y: y + (j === 1 ? 25 : 0) })));
+const HIDDEN = 3;
+const GAGS = ['꽝, 먼지만 있어', '양말 한 짝', '털뭉치', '빈 간식 봉지', '도둑냥 낮잠 자리였어', '뽁뽁이', '꽝, 다음 상자', '고무줄 하나', '털 엄청 묻었어', '여긴 비었어'];
+const dayKey = () => Math.floor((Date.now() + 9 * 3600000) / 86400000);
+function treasureMap() {
+  const day = dayKey();
+  const rnd = seeded(day * 7919);
+  const order = BOXES.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+  const pool = (data?.hall.items || []).slice();
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  const map = {};
+  order.slice(0, Math.min(HIDDEN, pool.length)).forEach((bi, n) => { map[bi] = pool[n]; });
+  return { day, map, gag: (i) => GAGS[(i * 7 + day) % GAGS.length] };
+}
+const openedKey = () => `doduk-boxes-${dayKey()}`;
+let opened = new Set(), openedDay = 0;
+function loadOpened() {
+  openedDay = dayKey();
+  try { opened = new Set(JSON.parse(localStorage.getItem(openedKey()) || '[]')); } catch { opened = new Set(); }
+}
+function saveOpened() { try { localStorage.setItem(openedKey(), JSON.stringify([...opened])); } catch {} }
+loadOpened();
+const boxAnim = {};
+let treasureBox = -1;
+function foundCount() { const { map } = treasureMap(); return [...opened].filter((i) => map[i]).length; }
+function openBox(i) {
+  const { map, gag } = treasureMap();
+  opened.add(i); saveOpened(); boxAnim[i] = performance.now();
+  const item = map[i];
+  if (!item) { speech.set('box' + i, { text: gag(i), until: Date.now() + 2500 }); return; }
+  const n = foundCount();
+  speech.set(myId, { text: n >= Object.keys(map).length ? '다 찾았다' : '찾았다', until: Date.now() + 2500 });
+  treasureBox = i;
+  setTimeout(() => {
+    if (me.scene !== 'treasure' || treasureBox !== i) return;
+    openCard(-2, item);
+    document.getElementById('sSpec').textContent = `도둑냥 보물창고에서 찾음 · 오늘 ${n}/${Object.keys(map).length}`;
+  }, 700);
+}
+function drawBox(b, i, t, now) {
+  const { map } = treasureMap();
+  const isOpen = opened.has(i), item = isOpen && map[i];
+  const k = isOpen ? Math.min(1, (now - (boxAnim[i] ?? -1e9)) / 300) : 0;
+  ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(b.x, b.y + 2, 56, 12, 0, 0, Math.PI * 2); ctx.fill();
+  if (item) {   // 보물: 금빛 + 물건이 튀어나옴
+    const glow = 0.35 + Math.sin(t * 4) * 0.15;
+    ctx.fillStyle = `rgba(255,213,74,${glow})`; ctx.beginPath(); ctx.arc(b.x, b.y - 70 - 60 * k, 70, 0, Math.PI * 2); ctx.fill();
+    const im = img(item.img), s = 64, rise = 100 * k;
+    if (im && im.complete && im.naturalWidth) {
+      rr(b.x - s / 2 - 4, b.y - 76 - s - rise + 30, s + 8, s + 8, 10); ctx.fillStyle = '#fff'; ctx.fill();
+      const q = Math.min(s / im.naturalWidth, s / im.naturalHeight);
+      ctx.drawImage(im, b.x - (im.naturalWidth * q) / 2, b.y - 72 - rise + 30 - s / 2 - (im.naturalHeight * q) / 2, im.naturalWidth * q, im.naturalHeight * q);
+    }
+  }
+  rr(b.x - 48, b.y - 70, 96, 70, 6); ctx.fillStyle = '#C9965F'; ctx.fill(); ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = '#E3C48F'; ctx.fillRect(b.x - 8, b.y - 69, 16, 68);
+  if (isOpen) {
+    rr(b.x - 44, b.y - 76, 88, 12, 4); ctx.fillStyle = '#5a3d22'; ctx.fill();
+    for (const side of [-1, 1]) {   // 뚜껑 날개가 바깥으로 젖혀짐
+      ctx.save(); ctx.translate(b.x + side * 48, b.y - 70); ctx.rotate(side * (0.2 + k * 0.9));
+      rr(side > 0 ? 0 : -40, -12, 40, 14, 4); ctx.fillStyle = '#B88550'; ctx.fill(); ctx.stroke(); ctx.restore();
+    }
+  } else {
+    rr(b.x - 52, b.y - 82, 104, 16, 5); ctx.fillStyle = '#B88550'; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#7a5230'; ctx.font = '30px Jua'; ctx.textAlign = 'center'; ctx.fillText('?', b.x, b.y - 24 + Math.sin(t * 3 + i) * 2);
+  }
+}
+function drawTreasureRoom() {
+  const total = Object.keys(treasureMap().map).length;
+  drawWallAndFloor(ROOM.w, ROOM.h, '#E6DCCB', '보물창고', `오늘 숨긴 보물 ${total}개 · 찾은 것 ${foundCount()}개 · 상자 앞에 서면 열려`);
+  rr(EXIT.x - 85, ROOM.h - 46, 170, 36, 10); ctx.fillStyle = '#2B2622'; ctx.fill();
+  ctx.fillStyle = '#FFD54A'; ctx.font = '19px Jua'; ctx.textAlign = 'center'; ctx.fillText('광장으로 나가기', EXIT.x, ROOM.h - 21);
+}
+
+// ---------- 포토존 ----------const inSpot = (p) => p.x > SPOT.x && p.x < SPOT.x + SPOT.w && p.y > SPOT.y && p.y < SPOT.y + SPOT.h;
 let flashUntil = 0;
 function bunting(g, x0, x1, y, size) {
   const cols = ['#E8402F', '#FFD54A', '#7B9E6B', '#8FC9E8', '#C57B88'];
@@ -734,11 +812,12 @@ function frame(now) {
   camY = viewH >= h ? -(viewH - h) / 2 : Math.max(0, Math.min(h - viewH, me.y - viewH * 0.55));
   ctx.setTransform(scale, 0, 0, scale, -camX * scale, -camY * scale);
   ctx.clearRect(camX, camY, VIEW_W, viewH);
-  if (isPlaza()) drawPlaza(t); else if (info.photo) drawPhotoRoom(t); else drawRoom(info);
+  if (isPlaza()) drawPlaza(t); else if (info.photo) drawPhotoRoom(t); else if (info.treasure) drawTreasureRoom(); else drawRoom(info);
 
   // 위쪽(y가 작은 것)부터 그려서 앞뒤가 자연스럽게 겹치게
   const tops = [];   // 말풍선을 맨 위에 그리려고 캐릭터 머리 위치를 모아 둠
   const items = info.shelves.map((s, i) => ({ y: s.y + 60, draw: () => drawShelf(s, info.items[i]) }));
+  if (info.treasure) BOXES.forEach((b, i) => { items.push({ y: b.y, draw: () => drawBox(b, i, t, now) }); tops.push(['box' + i, b.x, b.y - 96]); });
   if (isPlaza() && !LINEUP) {
     items.push({ y: BOOTH.y + 24, draw: () => drawBooth(t) });
     items.push({ y: bot.y, draw: () => tops.push(['bot', bot.x, drawBot(t, now)]) });
@@ -766,6 +845,13 @@ function frame(now) {
   const canSnap = !!info.photo && inSpot(me) && Math.hypot(me.tx - me.x, me.ty - me.y) < 2;
   if (canSnap !== snapBtn.classList.contains('show')) snapBtn.classList.toggle('show', canSnap);
 
+  if (info.treasure) {
+    if (openedDay !== dayKey()) loadOpened();   // 자정 지나면 새 상자
+    const stillHere = Math.hypot(me.tx - me.x, me.ty - me.y) < 2;
+    const bi = BOXES.findIndex((b) => Math.abs(me.x - b.x) < 60 && me.y > b.y - 10 && me.y < b.y + 60);
+    if (stillHere && bi >= 0 && !opened.has(bi)) openBox(bi);
+    if (openShelf === -2 && bi !== treasureBox) { sheet.classList.remove('open'); openShelf = -1; treasureBox = -1; }
+  }
   const n = nearShelf(info.shelves);
   const still = Math.hypot(me.tx - me.x, me.ty - me.y) < 2;
   if (n >= 0 && n !== openShelf && n !== dismissed && still && info.items[n]) openCard(n, info.items[n]);
