@@ -884,18 +884,25 @@ const snapBtn = document.getElementById('snap');
 const photoEl = document.getElementById('photo');
 const boothEl = document.getElementById('booth');
 let photoBlob = null, photoUrl = null;
+// 스레드·인스타·카톡 같은 앱 안 브라우저는 "저장하기"(다운로드)를 막음 → 그때는 사진을 꾹 눌러 저장하게 안내
+// 사진은 blob 주소 대신 data 주소로 넣어야 앱 안 브라우저에서도 꾹 눌러 저장이 됨 (11.04 "저장이 안돼" 신고)
+const IN_APP = /Instagram|Barcelona|FBAN|FBAV|KAKAOTALK|NAVER|Line\/|DaumApps|everytimeApp|; wv\)/i.test(navigator.userAgent);
 function showPhoto(canvasEl) {
+  const dataUrl = canvasEl.toDataURL('image/jpeg', 0.92);
+  document.getElementById('pImg').src = dataUrl;
+  const save = document.getElementById('pSave');
+  save.href = dataUrl; save.download = `doduk-${BREEDS[me.breed].name}.jpg`;
+  save.style.display = IN_APP ? 'none' : '';
+  const tip = document.querySelector('#photo .login');
+  tip.textContent = IN_APP ? '위 사진을 꾹 눌러서 "이미지 저장"을 눌러줘' : '저장이 안 되면 사진을 꾹 눌러서 저장해줘';
+  tip.classList.toggle('strong', IN_APP);
+  document.getElementById('pShare').style.display = 'none';
   canvasEl.toBlob((blob) => {
     photoBlob = blob;
-    if (photoUrl) URL.revokeObjectURL(photoUrl);
-    photoUrl = URL.createObjectURL(blob);
-    document.getElementById('pImg').src = photoUrl;
-    const save = document.getElementById('pSave');
-    save.href = photoUrl; save.download = `doduk-${BREEDS[me.breed].name}.png`;
-    const file = new File([blob], 'doduk.png', { type: 'image/png' });
+    const file = new File([blob], 'doduk.jpg', { type: 'image/jpeg' });
     document.getElementById('pShare').style.display = navigator.canShare && navigator.canShare({ files: [file] }) ? '' : 'none';
-    photoEl.classList.add('open');
-  }, 'image/png');
+  }, 'image/jpeg', 0.92);
+  photoEl.classList.add('open');
 }
 async function shoot() {
   if (booth.busy) return;
@@ -939,7 +946,7 @@ snapBtn.onclick = () => { if (booth.busy) return; renderBooth(); boothEl.classLi
 document.getElementById('bClose').onclick = () => boothEl.classList.remove('open');
 document.getElementById('shoot').onclick = shoot;
 document.getElementById('pShare').onclick = () => {
-  const file = new File([photoBlob], 'doduk.png', { type: 'image/png' });
+  const file = new File([photoBlob], 'doduk.jpg', { type: 'image/jpeg' });
   navigator.share({ files: [file], text: '도둑냥 창고에서 찍었어 @doduk_nyang' }).catch(() => {});
 };
 document.getElementById('pClose').onclick = () => photoEl.classList.remove('open');
