@@ -250,7 +250,7 @@
   }
   function drawPlazaTree(t) {
     ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(TREE.x, TREE.y + 30, 150, 22, 0, 0, Math.PI * 2); ctx.fill();
-    drawTree(ctx, TREE.x, TREE.y, TREE.w, TREE.h, t, orns.slice(0, 300), 8);
+    drawTree(ctx, TREE.x, TREE.y, TREE.w, TREE.h, t, orns.slice(0, 300), 10);
     R(ctx, TREE.x - 80, TREE.y + 44, 160, 30, 8); ctx.fillStyle = '#2B2622'; ctx.fill();
     ctx.fillStyle = '#FFD54A'; ctx.font = '17px Jua'; ctx.textAlign = 'center'; ctx.fillText(`장식 ${orns.length}개 달림`, TREE.x, TREE.y + 65);
   }
@@ -266,8 +266,8 @@
     tg.fillStyle = '#1E2233'; tg.fillRect(0, 0, TW, TH);
     tg.fillStyle = 'rgba(255,255,255,.5)'; for (let i = 0; i < 40; i++) { tg.beginPath(); tg.arc((i * 137) % TW, (i * 59) % 300, 1.5, 0, Math.PI * 2); tg.fill(); }
     tg.fillStyle = '#E8EEF5'; tg.fillRect(0, TBY + 20, TW, TH);
-    drawTree(tg, TCX, TBY, TWD, THT, performance.now() / 1000, orns.slice(0, 300), 13);
-    if (pending) { drawOrn(tg, pending.kind, TCX + pending.x * TWD / 2, TBY - THT + pending.y * THT, 15); tg.strokeStyle = '#fff'; tg.setLineDash([5, 5]); tg.beginPath(); tg.arc(TCX + pending.x * TWD / 2, TBY - THT + pending.y * THT, 24, 0, Math.PI * 2); tg.stroke(); tg.setLineDash([]); }
+    drawTree(tg, TCX, TBY, TWD, THT, performance.now() / 1000, orns.slice(0, 300), 17);
+    if (pending) { drawOrn(tg, pending.kind, TCX + pending.x * TWD / 2, TBY - THT + pending.y * THT, 20); tg.strokeStyle = '#fff'; tg.lineWidth = 3; tg.setLineDash([6, 6]); tg.beginPath(); tg.arc(TCX + pending.x * TWD / 2, TBY - THT + pending.y * THT, 32, 0, Math.PI * 2); tg.stroke(); tg.setLineDash([]); }
     document.getElementById('treeLeft').textContent = leftToday() > 0 ? `오늘 ${leftToday()}개 더 달 수 있어. 장식을 고르고 트리를 눌러 줘` : '오늘은 다 달았어. 내일 또 달아 줘';
     document.getElementById('treeHang').disabled = !pending || leftToday() <= 0;
   }
@@ -302,6 +302,25 @@
   const treeBtn = document.getElementById('treeBtn');
   treeBtn.onclick = () => { renderTreeBox(); treeEl.classList.add('open'); };
   setInterval(() => { if (treeEl.classList.contains('open')) renderTreeBox(); }, 500);   // 전구 반짝임
+
+  // ---------- 홍보 영상(film.js)용 손잡이: ?film 일 때만 ----------
+  if (film) window.filmExtras = {
+    arcade: {
+      reset: () => { lsSet(`doduk-jump-${kstDate()}`, []); board = []; },
+      start: () => { gameEl.classList.add('open'); startRun(); },
+      jump, run: () => run, PX, cv: gcv,
+      tick: (now) => { if (run && !run.over) tick(now); },
+    },
+    tree: {
+      reset: () => { orns = []; lsSet(todayKey(), 0); },
+      open: () => { renderTreeBox(); treeEl.classList.add('open'); },
+      close: () => document.getElementById('treeClose').click(),
+      pick: (i) => kinds.querySelectorAll('button')[i].click(),
+      place: (u, v) => { pending = { kind: pick, x: u, y: v }; renderTreeBox(); },
+      hang: () => document.getElementById('treeHang').click(),
+      render: renderTreeBox, cv: tcv,
+    },
+  };
 
   // ---------- 광장에 그리기 + 버튼 표시 ----------
   plazaHooks.push((items, t) => {
