@@ -74,7 +74,7 @@
   <h2>사천성</h2>
   <p>같은 강아지·고양이 두 마리를 눌러서 없애 줘</p>
   <p>둘 사이를 <b>꺾이는 곳 두 번 이하</b>인 선으로 이을 수 있어야 해. 판 바깥으로 돌아가도 돼</p>
-  <p>시간 안에 판을 다 비우면 다음 단계. 2단계부터는 짝을 없앨 때마다 남은 아이들이 한쪽으로 쏠려</p>
+  <p>시간 안에 판을 다 비우면 다음 단계. 2단계부터는 짝을 없앨 때마다 남은 아이들이 한쪽으로 쏠리고, 못 없애는 택배 상자가 길을 막아</p>
   <p class="muted">시험판이라 점수는 아직 저장되지 않아</p>
   <button class="main" id="startBtn">시작</button>
 </div></div>
@@ -137,22 +137,30 @@
   const py = (r) => (r === 0 ? m / 2 : r === ROWS + 1 ? m + ROWS * th + m / 2 : m + (r - 1) * th + th / 2);
 
   // ---------- 단계: 시간 제한 + 2단계부터 남은 아이들이 한쪽으로 쏠림 ----------
+  // boxes = 방해 상자 수 (못 없애고 선을 막음). 한 바퀴(5단계) 돌 때마다 2개씩 늘어남, 최대 10개
   const STAGES = [
-    { time: 150, slide: null,    label: '기본' },
-    { time: 150, slide: 'down',  label: '아래로 쏠림' },
-    { time: 145, slide: 'left',  label: '왼쪽으로 쏠림' },
-    { time: 140, slide: 'up',    label: '위로 쏠림' },
-    { time: 135, slide: 'right', label: '오른쪽으로 쏠림' },
+    { time: 150, slide: null,    label: '기본',          boxes: 0 },
+    { time: 150, slide: 'down',  label: '아래로 쏠림',   boxes: 2 },
+    { time: 145, slide: 'left',  label: '왼쪽으로 쏠림', boxes: 4 },
+    { time: 140, slide: 'up',    label: '위로 쏠림',     boxes: 4 },
+    { time: 135, slide: 'right', label: '오른쪽으로 쏠림', boxes: 6 },
   ];
-  const stageInfo = (n) => { const s = STAGES[(n - 1) % STAGES.length]; return { ...s, time: Math.max(90, s.time - Math.floor((n - 1) / STAGES.length) * 20) }; };
+  const stageInfo = (n) => {
+    const s = STAGES[(n - 1) % STAGES.length], lap = Math.floor((n - 1) / STAGES.length);
+    return { ...s, time: Math.max(90, s.time - lap * 20), boxes: Math.min(10, s.boxes + lap * 2) };
+  };
+  const stageLabel = (info) => info.boxes ? `${info.label} · 상자 ${info.boxes}개` : info.label;
+  const BOX = -1;   // 방해 상자
 
   // ---------- 판 ----------
   let grid, sel, hint, pathFx, pops, moving = [], score, combo, lastMatch, hintsLeft, shufflesLeft, running;
   let stage = 1, deadline = 0, pausedLeft = null;
   const empty = (r, c) => r < 0 || c < 0 || r > ROWS + 1 || c > COLS + 1 ? false : grid[r][c] === null;
   function newGrid() {
-    const kinds = [];
-    KINDS.forEach((_, k) => { for (let i = 0; i < (COLS * ROWS) / KINDS.length; i++) kinds.push(k); });
+    const nBox = stageInfo(stage).boxes;
+    const kinds = [], order = shuffleArr(KINDS.map((_, k) => k));   // 상자 때문에 칸이 모자라면 몇 종은 4장 대신 2장
+    for (let p = 0; kinds.length < COLS * ROWS - nBox; p++) kinds.push(order[p % order.length], order[p % order.length]);
+    for (let i = 0; i < nBox; i++) kinds.push(BOX);
     shuffleArr(kinds);
     grid = [];
     for (let r = 0; r < ROWS + 2; r++) { grid.push([]); for (let c = 0; c < COLS + 2; c++) grid[r].push(r === 0 || c === 0 || r === ROWS + 1 || c === COLS + 1 ? null : kinds.pop()); }
@@ -162,10 +170,17 @@
   function reshuffle() {
     for (let tries = 0; tries < 50; tries++) {
       const cells = [], kinds = [];
-      for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) if (grid[r][c] !== null) { cells.push([r, c]); kinds.push(grid[r][c]); }
+      for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) if (grid[r][c] !== null && grid[r][c] !== BOX) { cells.push([r, c]); kinds.push(grid[r][c]); }   // 상자는 제자리
       shuffleArr(kinds);
       cells.forEach(([r, c], i) => { grid[r][c] = kinds[i]; });
       if (!cells.length || findMove()) return;
+    }
+    for (let tries = 0; tries < 50; tries++) {   // 상자가 길을 꽉 막고 있으면 상자 자리까지 같이 섞음
+      const cells = [], kinds = [];
+      for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) if (grid[r][c] !== null) { cells.push([r, c]); kinds.push(grid[r][c]); }
+      shuffleArr(kinds);
+      cells.forEach(([r, c], i) => { grid[r][c] = kinds[i]; });
+      if (findMove()) return;
     }
   }
 
@@ -193,11 +208,11 @@
   }
   function findMove() {
     const byKind = {};
-    for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) if (grid[r][c] !== null) { const k = grid[r][c]; if (!byKind[k]) byKind[k] = []; byKind[k].push([r, c]); }
+    for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) if (grid[r][c] !== null && grid[r][c] !== BOX) { const k = grid[r][c]; if (!byKind[k]) byKind[k] = []; byKind[k].push([r, c]); }
     for (const list of Object.values(byKind)) for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) if (findPath(list[i], list[j])) return [list[i], list[j]];
     return null;
   }
-  const remaining = () => { let n = 0; for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) if (grid[r][c] !== null) n++; return n; };
+  const remaining = () => { let n = 0; for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) if (grid[r][c] !== null && grid[r][c] !== BOX) n++; return n; };   // 상자는 안 셈
 
   // ---------- 누르기 ----------
   // 앱 안 브라우저마다 터치 신호가 달라서 pointer / touch / mouse 중 먼저 온 것 하나만 처리
@@ -217,6 +232,7 @@
     const x = clientX - rect.left, y = clientY - rect.top;
     const c = Math.floor((x - m) / ts) + 1, r = Math.floor((y - m) / th) + 1;
     if (r < 1 || r > ROWS || c < 1 || c > COLS || grid[r][c] === null) return;
+    if (grid[r][c] === BOX) { toast('상자는 못 없애, 돌아가'); return; }
     const here = [r, c];
     if (!sel) { sel = here; return; }
     if (sel[0] === r && sel[1] === c) { sel = null; return; }
@@ -271,7 +287,7 @@
     setTimeout(() => {
       document.getElementById('clearTitle').textContent = `${stage}단계 성공`;
       document.getElementById('clearDetail').textContent = `남은 시간 ${left}초 · 보너스 ${bonus}점 · 지금 ${score}점`;
-      document.getElementById('clearNext').textContent = `다음은 ${stage + 1}단계: ${next.label}, ${next.time}초 (힌트·섞기 하나씩 더 줌)`;
+      document.getElementById('clearNext').textContent = `다음은 ${stage + 1}단계: ${stageLabel(next)}, ${next.time}초 (힌트·섞기 하나씩 더 줌)`;
       document.getElementById('clearBox').classList.add('open');
     }, 500);
   }
@@ -309,7 +325,7 @@
     const info = stageInfo(stage);
     deadline = performance.now() + info.time * 1000; pausedLeft = null;
     running = true; updateHud(); tickTime();
-    toast(`${stage}단계 · ${info.label}`);
+    toast(`${stage}단계 · ${stageLabel(info)}`);
   }
   // 남은 시간 표시 + 시간 끝 확인 (앱을 내리면 시간 멈춤)
   function tickTime() {
@@ -430,6 +446,19 @@
     if (tileCache[key]) return tileCache[key];
     const tc = document.createElement('canvas'); tc.width = Math.ceil(ts * dpr); tc.height = Math.ceil(th * dpr);
     const q = tc.getContext('2d'); q.scale(dpr, dpr);
+    if (kind === BOX) {   // 창고 택배 상자: 테이프 + 발바닥 도장
+      q.fillStyle = 'rgba(42,36,32,.22)'; q.beginPath(); q.roundRect(2, 4, ts - 4, th - 4, 6); q.fill();
+      q.fillStyle = '#C9965F'; q.strokeStyle = '#2a2420'; q.lineWidth = 2;
+      q.beginPath(); q.roundRect(2, 2, ts - 4, th - 6, 6); q.fill(); q.stroke();
+      q.fillStyle = '#B07F4C'; q.fillRect(4, th * 0.3, ts - 8, 2);
+      q.fillStyle = '#E8D3A6'; q.fillRect(ts / 2 - ts * 0.09, 3, ts * 0.18, th * 0.3);
+      q.strokeStyle = 'rgba(42,36,32,.35)'; q.lineWidth = 1; q.strokeRect(ts / 2 - ts * 0.09, 3, ts * 0.18, th * 0.3);
+      q.fillStyle = 'rgba(122,74,40,.75)';
+      const sx = ts / 2, sy = th * 0.62, s = ts * 0.13;
+      q.beginPath(); q.ellipse(sx, sy + s * 0.3, s * 0.7, s * 0.55, 0, 0, Math.PI * 2); q.fill();
+      for (const [dx, dy] of [[-0.75, -0.45], [-0.25, -0.85], [0.25, -0.85], [0.75, -0.45]]) { q.beginPath(); q.arc(sx + dx * s, sy + dy * s, s * 0.24, 0, Math.PI * 2); q.fill(); }
+      return (tileCache[key] = tc);
+    }
     const lift = isSel ? 4 : 0;
     q.fillStyle = 'rgba(42,36,32,.18)'; q.beginPath(); q.roundRect(2, 4, ts - 4, th - 4, 9); q.fill();
     q.fillStyle = isSel ? '#FFD54A' : TILE_BG[kind]; q.strokeStyle = '#2a2420'; q.lineWidth = 2;
