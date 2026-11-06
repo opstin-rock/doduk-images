@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>도둑냥 오락실</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700&display=swap">
+<style>
+  :root { --ink:#1f1f22; --cream:#fbf6ec; --yellow:#ffd54a; --red:#e8402f; --line:#2a2420; --muted:#6b6560; --green:#5E9E6E; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; background:var(--cream); color:var(--ink); font-family:"Noto Sans KR",sans-serif; -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+  main { max-width:460px; margin:0 auto; padding:16px 14px 32px; word-break:keep-all; }
+  h1 { font-family:"Jua",sans-serif; font-weight:400; font-size:28px; margin:0 0 12px; text-align:center; }
+  .tag { font-size:11px; background:var(--line); color:#fff; border-radius:999px; padding:3px 8px; margin-left:6px; vertical-align:middle; font-family:"Noto Sans KR",sans-serif; }
+  .gauge { background:var(--line); color:#fff; border-radius:18px; padding:16px 16px 14px; text-align:center; position:relative; overflow:hidden; }
+  .gauge small { display:block; font-size:13px; opacity:.85; }
+  .gauge .num { font-family:"Jua",sans-serif; font-size:44px; color:var(--yellow); margin:2px 0; letter-spacing:.5px; }
+  .gauge .sub { font-size:13px; opacity:.9; }
+  .gauge .note { margin-top:10px; font-size:12px; line-height:1.55; background:rgba(255,255,255,.08); border-radius:10px; padding:8px 10px; }
+  .mine { display:flex; justify-content:space-between; align-items:center; background:#fff; border:2px solid var(--line); border-radius:12px; padding:8px 12px; margin:10px 0 16px; font-size:14px; }
+  .mine b { font-family:"Jua",sans-serif; font-weight:400; font-size:20px; }
+  h2 { font-family:"Jua",sans-serif; font-weight:400; font-size:20px; margin:0 0 8px; }
+  .game { display:flex; gap:12px; align-items:center; background:#fff; border:2px solid var(--line); border-radius:16px; padding:10px; margin-bottom:10px; text-decoration:none; color:inherit; }
+  .game canvas { flex:none; width:84px; height:84px; border-radius:12px; }
+  .game .info { flex:1; min-width:0; }
+  .game .name { font-family:"Jua",sans-serif; font-size:21px; }
+  .game .desc { font-size:13px; color:var(--muted); line-height:1.45; margin:2px 0 4px; }
+  .game .stat { font-size:12px; }
+  .game .go { flex:none; font-family:"Jua",sans-serif; font-size:16px; background:var(--line); color:#fff; border-radius:10px; padding:9px 12px; }
+  .game.soon { opacity:.55; border-style:dashed; }
+  .game.soon .go { background:#bbb; }
+  footer { margin-top:20px; text-align:center; color:var(--muted); font-size:12px; line-height:1.6; }
+</style>
+</head>
+<body>
+<main>
+  <h1>도둑냥 오락실<span class="tag">시험판</span></h1>
+
+  <div class="gauge">
+    <small>다 같이 모은 점수</small>
+    <div class="num" id="total">-</div>
+    <div class="sub" id="sub">불러오는 중</div>
+    <div class="note">이 점수만큼 펫바자 창고의 사료, 간식 등을 보호소나 단체로 보낼 생각이야. 몇 점에 얼마나 보낼지, 어디로 보낼지는 지금 정하는 중</div>
+  </div>
+  <div class="mine"><span>내가 보탠 점수</span><b id="mine">0</b></div>
+
+  <h2>게임 고르기</h2>
+  <a class="game" href="link.html?v=11">
+    <canvas id="thSacheon" width="168" height="168"></canvas>
+    <div class="info"><div class="name">사천성</div><div class="desc">같은 강아지·고양이 두 마리를 이어서 없애기</div><div class="stat" id="stSacheon">&nbsp;</div></div>
+    <span class="go">하기</span>
+  </a>
+  <a class="game" href="peaks.html?v=6">
+    <canvas id="thPeaks" width="168" height="168"></canvas>
+    <div class="info"><div class="name">트라이피크</div><div class="desc">펼친 카드보다 1 크거나 작은 카드 가져오기</div><div class="stat" id="stPeaks">&nbsp;</div></div>
+    <span class="go">하기</span>
+  </a>
+  <div class="game soon"><canvas id="thSoon1" width="168" height="168"></canvas><div class="info"><div class="name">간식 3매치</div><div class="desc">만드는 중</div></div><span class="go">곧</span></div>
+  <div class="game soon"><canvas id="thSoon2" width="168" height="168"></canvas><div class="info"><div class="name">간식 합치기</div><div class="desc">만드는 중</div></div><span class="go">곧</span></div>
+
+  <footer>도둑냥은 펫바자가 운영하는 AI 고양이야<br>점수는 게임 이름과 점수만 저장하고, 누가 했는지는 남기지 않아</footer>
+</main>
+
+<script>
+  if (window.CanvasRenderingContext2D && !CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+      r = Math.max(0, Math.min(typeof r === 'number' ? r : (r && r[0]) || 0, Math.abs(w) / 2, Math.abs(h) / 2));
+      this.moveTo(x + r, y); this.lineTo(x + w - r, y); this.arcTo(x + w, y, x + w, y + r, r);
+      this.lineTo(x + w, y + h - r); this.arcTo(x + w, y + h, x + w - r, y + h, r);
+      this.lineTo(x + r, y + h); this.arcTo(x, y + h, x, y + h - r, r);
+      this.lineTo(x, y + r); this.arcTo(x, y, x + r, y, r); this.closePath();
+    };
+  }
+</script>
+<script src="../pets.js?v=26"></script>
+<script src="../config.js?v=26"></script>
+<script src="score.js?v=1"></script>
+<script>
+(() => {
+  // ---------- 모두의 점수 ----------
+  async function refresh() {
+    document.getElementById('mine').textContent = Score.fmt(Score.mine());
+    const [t, g] = await Promise.all([Score.total(), Score.byGame()]);
+    if (t) {
+      document.getElementById('total').textContent = Score.fmt(t.total);
+      document.getElementById('sub').textContent = `오늘 +${Score.fmt(t.today)} · 지금까지 ${Score.fmt(t.plays)}번 보탬`;
+    } else {
+      document.getElementById('sub').textContent = '지금은 못 불러왔어. 잠시 뒤에 다시 볼게';
+    }
+    const st = (id, x) => { document.getElementById(id).textContent = x ? `모두 ${Score.fmt(x.total)}점 · ${Score.fmt(x.plays)}번` : '아직 기록 없음'; };
+    if (g) { st('stSacheon', g.sacheon); st('stPeaks', g.peaks); }
+  }
+  refresh(); setInterval(refresh, 20000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+
+  // ---------- 작은 그림 ----------
+  const face = (q, name, cx, cy, size) => {
+    const i = BREEDS.findIndex((b) => b.name === name), b = BREEDS[i];
+    const headR = b.headR ?? 16, snout = b.snout ?? (b.kind === 'dog' ? 7 : 0);
+    const k = size / (headR * 2 + 16);
+    q.save(); q.translate(cx, cy); q.scale(k, k);
+    q.lineWidth = 2.4; q.strokeStyle = '#2a2420'; q.lineJoin = 'round'; q.lineCap = 'round';
+    drawHead(q, b, -(snout - headR * 0.17) / 2, 7, headR, b.head ?? b.base, snout, 0.3, i);
+    q.restore();
+  };
+  const tile = (q, x, y, w, h, bg) => { q.fillStyle = bg; q.strokeStyle = '#2a2420'; q.lineWidth = 3; q.beginPath(); q.roundRect(x, y, w, h, 12); q.fill(); q.stroke(); };
+  // 사천성: 타일 4장 + 잇는 선
+  (() => {
+    const q = document.getElementById('thSacheon').getContext('2d');
+    q.fillStyle = '#EFE4D2'; q.fillRect(0, 0, 168, 168);
+    const t = [['시바', '#FFE3C2', 12, 12], ['턱시도', '#E8E3F5', 88, 12], ['삼색이', '#FDE4EC', 12, 88], ['시바', '#FFE3C2', 88, 88]];
+    t.forEach(([n, bg, x, y]) => { tile(q, x, y, 68, 68, bg); face(q, n, x + 34, y + 34, 52); });
+    q.strokeStyle = '#E8402F'; q.lineWidth = 6; q.lineCap = 'round'; q.beginPath(); q.moveTo(46, 80); q.lineTo(46, 84); q.lineTo(84, 84); q.lineTo(122, 84); q.lineTo(122, 88); q.stroke();
+  })();
+  // 트라이피크: 카드 3장
+  (() => {
+    const q = document.getElementById('thPeaks').getContext('2d');
+    q.fillStyle = '#5E9E6E'; q.fillRect(0, 0, 168, 168);
+    const card = (x, y, rot, txt, col, back) => {
+      q.save(); q.translate(x, y); q.rotate(rot);
+      q.fillStyle = back ? '#C9965F' : '#FFFDF8'; q.strokeStyle = '#2a2420'; q.lineWidth = 3;
+      q.beginPath(); q.roundRect(-30, -42, 60, 84, 8); q.fill(); q.stroke();
+      if (!back) { q.fillStyle = col; q.font = '30px Jua'; q.textAlign = 'center'; q.textBaseline = 'middle'; q.fillText(txt, 0, 0); }
+      else { q.fillStyle = 'rgba(255,246,230,.85)'; q.beginPath(); q.arc(0, 4, 9, 0, Math.PI * 2); q.fill(); for (const [dx, dy] of [[-10, -9], [-3, -14], [4, -14], [11, -9]]) { q.beginPath(); q.arc(dx, dy, 3.6, 0, Math.PI * 2); q.fill(); } }
+      q.restore();
+    };
+    card(50, 70, -0.18, '', '', true); card(118, 70, 0.18, '', '', true); card(84, 98, 0, '7', '#2F7FB8');
+  })();
+  // 만드는 중: 간식 그림 대신 물음표 타일
+  for (const id of ['thSoon1', 'thSoon2']) {
+    const q = document.getElementById(id).getContext('2d');
+    q.fillStyle = '#EFE4D2'; q.fillRect(0, 0, 168, 168); tile(q, 34, 34, 100, 100, '#fff');
+    q.fillStyle = '#bbb'; q.font = '64px Jua'; q.textAlign = 'center'; q.textBaseline = 'middle'; q.fillText('?', 84, 88);
+  }
+})();
+</script>
+</body>
+</html>
