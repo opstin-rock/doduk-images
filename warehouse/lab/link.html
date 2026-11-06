@@ -216,16 +216,17 @@
 
   // ---------- 누르기 ----------
   // 앱 안 브라우저마다 터치 신호가 달라서 pointer / touch / mouse 중 먼저 온 것 하나만 처리
-  let lastTap = { at: 0, x: -99, y: -99 };
-  function onTap(clientX, clientY) {
+  // 종류가 다른 신호가 같은 자리에 곧바로 오면 같은 손가락의 중복 신호라 무시 (같은 종류는 빠른 연타라 그대로 받음)
+  let lastTap = { at: 0, x: -99, y: -99, src: '' };
+  function onTap(clientX, clientY, src) {
     const now = Date.now();
-    if (now - lastTap.at < 450 && Math.abs(clientX - lastTap.x) < 12 && Math.abs(clientY - lastTap.y) < 12) return;   // 같은 손가락의 중복 신호
-    lastTap = { at: now, x: clientX, y: clientY };
+    if (src !== lastTap.src && now - lastTap.at < 600 && Math.abs(clientX - lastTap.x) < 15 && Math.abs(clientY - lastTap.y) < 15) return;
+    lastTap = { at: now, x: clientX, y: clientY, src };
     tapAt(clientX, clientY); dirty = true;
   }
-  if (window.PointerEvent) cv.addEventListener('pointerdown', (e) => { e.preventDefault(); onTap(e.clientX, e.clientY); });
-  cv.addEventListener('touchstart', (e) => { e.preventDefault(); const t = e.changedTouches[0]; onTap(t.clientX, t.clientY); }, { passive: false });
-  cv.addEventListener('mousedown', (e) => onTap(e.clientX, e.clientY));
+  if (window.PointerEvent) cv.addEventListener('pointerdown', (e) => { e.preventDefault(); onTap(e.clientX, e.clientY, 'p'); });
+  cv.addEventListener('touchstart', (e) => { e.preventDefault(); const t = e.changedTouches[0]; onTap(t.clientX, t.clientY, 't'); }, { passive: false });
+  cv.addEventListener('mousedown', (e) => onTap(e.clientX, e.clientY, 'm'));
   function tapAt(clientX, clientY) {
     if (!running) return;
     const rect = cv.getBoundingClientRect();
