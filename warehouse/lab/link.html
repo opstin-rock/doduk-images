@@ -59,6 +59,8 @@
   .sum div b { font-family:"Jua",sans-serif; font-weight:400; font-size:16px; white-space:nowrap; }
   .sum .total { border-top:1px dashed #c9bfae; margin-top:2px; padding-top:2px; }
   .next { font-size:14px; line-height:1.6; margin:8px 0 0; }
+  .tools .small { flex:0 0 78px; font-size:15px; }
+  .tools .off { color:var(--muted); }
 </style>
 </head>
 <body>
@@ -77,6 +79,7 @@
     <button id="hintBtn">힌트 3</button>
     <button id="shuffleBtn">섞기 1</button>
     <button id="restartBtn">처음부터</button>
+    <button id="vibeBtn" class="small">진동 켬</button>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -129,6 +132,7 @@
   window.addEventListener('error', (e) => { const el = document.getElementById('err'); el.style.display = 'block'; el.textContent = '오류: ' + (e.message || e.type); });
 </script>
 <script src="../pets.js?v=26"></script>
+<script src="haptic.js?v=1"></script>
 <script>
 (() => {
   // ---------- 설정 ----------
@@ -250,13 +254,13 @@
     const x = clientX - rect.left, y = clientY - rect.top;
     const c = Math.floor((x - m) / ts) + 1, r = Math.floor((y - m) / th) + 1;
     if (r < 1 || r > ROWS || c < 1 || c > COLS || grid[r][c] === null) return;
-    if (grid[r][c] === BOX) { toast('상자는 못 없애, 돌아가'); return; }
+    if (grid[r][c] === BOX) { Haptic.nope(); toast('상자는 못 없애, 돌아가'); return; }
     const here = [r, c];
     if (!sel) { sel = here; return; }
     if (sel[0] === r && sel[1] === c) { sel = null; return; }
     if (grid[sel[0]][sel[1]] !== grid[r][c]) { sel = here; return; }
     const path = findPath(sel, here);
-    if (!path) { toast('못 이어'); sel = here; return; }
+    if (!path) { Haptic.nope(); toast('못 이어'); sel = here; return; }
     match(sel, here, path);
   }
   function match(a, b, path) {
@@ -266,6 +270,7 @@
     const gain = 10 + Math.min(combo, 5) * 5;   // 콤보 보너스는 최대 +25
     score += gain;
     burst(a, b, kind, combo, gain, now);
+    if (remaining() > 2) Haptic.combo(combo);   // 마지막 짝이면 아래 성공 진동만
     pathFx = { path, until: now + 320 + Math.min(combo, 8) * 30, combo };
     pops.push({ r: a[0], c: a[1], kind, at: now }, { r: b[0], c: b[1], kind, at: now });
     grid[a[0]][a[1]] = null; grid[b[0]][b[1]] = null;
@@ -298,7 +303,7 @@
     const left = Math.max(0, Math.ceil((deadline - performance.now()) / 1000));
     const bonus = left * 5;
     score += bonus;
-    confetti(performance.now());
+    confetti(performance.now()); Haptic.big();
     hintsLeft = Math.min(5, hintsLeft + 1); shufflesLeft = Math.min(3, shufflesLeft + 1);
     updateHud();
     const next = stageInfo(stage + 1);
@@ -332,6 +337,10 @@
     reshuffle(); shufflesLeft--; sel = null; hint = null; toast('섞었어'); updateHud();
   };
   document.getElementById('restartBtn').onclick = () => start();
+  const vibeBtn = document.getElementById('vibeBtn');
+  const vibeLabel = () => { vibeBtn.textContent = Haptic.on ? '진동 켬' : '진동 끔'; vibeBtn.classList.toggle('off', !Haptic.on); };
+  vibeBtn.onclick = () => { Haptic.toggle(); vibeLabel(); toast(Haptic.on ? '진동 켰어' : '진동 껐어'); };
+  vibeLabel();
   document.getElementById('startBtn').onclick = () => { document.getElementById('startBox').classList.remove('open'); start(); };
   document.getElementById('againBtn').onclick = () => { document.getElementById('endBox').classList.remove('open'); start(); };
   document.getElementById('nextBtn').onclick = () => { document.getElementById('clearBox').classList.remove('open'); stage++; startStage(); };
