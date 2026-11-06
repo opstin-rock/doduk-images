@@ -144,7 +144,7 @@
 <script>
 (() => {
   // ---------- 설정 ----------
-  const COLS = 6, ROWS = 8;                        // 48칸 = 12종 x 4장
+  const COLS = 5, ROWS = 7;                        // 35칸 (폰에서 타일이 크게 보이도록). 칸이 홀수라 한 칸은 처음부터 비워 둠 (상자 수에 따라)
   const KINDS = ['시바', '비숑', '퍼그', '시베리안허스키', '달마시안', '비글',
                  '치즈 코숏', '턱시도', '삼색이', '러시안블루', '샴', '스핑크스'];
   const TILE_BG = ['#FFE3C2', '#E6F4FF', '#FFF2B3', '#DDE7F7', '#F0F0F0', '#FFE0D6',
@@ -168,8 +168,8 @@
     cv.style.width = '0px'; cv.style.height = '0px';   // 판 자신이 자리 재기에 끼어들지 않게
     const aw = Math.min(stageEl.clientWidth, 480), ah = stageEl.clientHeight;
     lastBox = `${aw}x${ah}`;
-    const byW = Math.floor(aw / (COLS + 0.6)), byH = Math.floor(ah / (ROWS * 1.12 + 0.6));
-    ts = Math.max(28, Math.min(byW, byH)); th = Math.round(ts * 1.12); m = Math.round(ts * 0.3);
+    const byW = Math.floor(aw / (COLS + 0.5)), byH = Math.floor(ah / (ROWS * 1.04 + 0.5));
+    ts = Math.max(28, Math.min(byW, byH)); th = Math.round(ts * 1.04); m = Math.round(ts * 0.25);
     W = COLS * ts + m * 2; H = ROWS * th + m * 2;
     cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
   }
@@ -180,15 +180,15 @@
   // ---------- 단계: 시간 제한 + 2단계부터 남은 아이들이 한쪽으로 쏠림 ----------
   // boxes = 방해 상자 수 (못 없애고 선을 막음). 한 바퀴(5단계) 돌 때마다 2개씩 늘어남, 최대 10개
   const STAGES = [
-    { time: 150, slide: null,    label: '기본',          boxes: 0 },
-    { time: 150, slide: 'down',  label: '아래로 쏠림',   boxes: 2 },
-    { time: 145, slide: 'left',  label: '왼쪽으로 쏠림', boxes: 4 },
-    { time: 140, slide: 'up',    label: '위로 쏠림',     boxes: 4 },
-    { time: 135, slide: 'right', label: '오른쪽으로 쏠림', boxes: 6 },
+    { time: 110, slide: null,    label: '기본',          boxes: 0 },
+    { time: 110, slide: 'down',  label: '아래로 쏠림',   boxes: 1 },
+    { time: 105, slide: 'left',  label: '왼쪽으로 쏠림', boxes: 3 },
+    { time: 100, slide: 'up',    label: '위로 쏠림',     boxes: 3 },
+    { time: 95,  slide: 'right', label: '오른쪽으로 쏠림', boxes: 5 },
   ];
   const stageInfo = (n) => {
     const s = STAGES[(n - 1) % STAGES.length], lap = Math.floor((n - 1) / STAGES.length);
-    return { ...s, time: Math.max(90, s.time - lap * 20), boxes: Math.min(10, s.boxes + lap * 2) };
+    return { ...s, time: Math.max(65, s.time - lap * 12), boxes: Math.min(7, s.boxes + lap * 2) };
   };
   const stageLabel = (info) => info.boxes ? `${info.label} · 상자 ${info.boxes}개` : info.label;
   const BOX = -1;   // 방해 상자
@@ -200,8 +200,10 @@
   function newGrid() {
     const nBox = stageInfo(stage).boxes;
     const kinds = [], order = shuffleArr(KINDS.map((_, k) => k));   // 상자 때문에 칸이 모자라면 몇 종은 4장 대신 2장
-    for (let p = 0; kinds.length < COLS * ROWS - nBox; p++) kinds.push(order[p % order.length], order[p % order.length]);
+    const pets = Math.floor((COLS * ROWS - nBox) / 2) * 2;   // 짝수만큼만 (남는 한 칸은 빈칸)
+    for (let p = 0; kinds.length < pets; p++) kinds.push(order[p % order.length], order[p % order.length]);
     for (let i = 0; i < nBox; i++) kinds.push(BOX);
+    while (kinds.length < COLS * ROWS) kinds.push(null);
     shuffleArr(kinds);
     grid = [];
     for (let r = 0; r < ROWS + 2; r++) { grid.push([]); for (let c = 0; c < COLS + 2; c++) grid[r].push(r === 0 || c === 0 || r === ROWS + 1 || c === COLS + 1 ? null : kinds.pop()); }
