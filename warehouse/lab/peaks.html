@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>트라이피크 시험판</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700&display=swap">
+<style>
+  :root { --ink:#1f1f22; --cream:#fbf6ec; --yellow:#ffd54a; --red:#e8402f; --line:#2a2420; --muted:#6b6560; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; background:var(--cream); color:var(--ink); font-family:"Noto Sans KR",sans-serif; -webkit-text-size-adjust:100%; overscroll-behavior:none; }
+  .wrap { max-width:480px; margin:0 auto; padding:10px 8px 24px; }
+  header { padding:2px 6px 8px; }
+  h1 { font-family:"Jua",sans-serif; font-weight:400; font-size:24px; margin:0; }
+  .tag { font-size:11px; background:var(--line); color:#fff; border-radius:999px; padding:3px 8px; margin-left:6px; vertical-align:middle; }
+  .hud { display:flex; gap:6px; padding:0 4px 6px; }
+  .stat { flex:1; background:#fff; border:2px solid var(--line); border-radius:12px; padding:5px 0; text-align:center; }
+  .stat b { display:block; font-family:"Jua",sans-serif; font-size:20px; font-weight:400; }
+  .stat span { font-size:11px; color:var(--muted); }
+  .combobar { height:6px; margin:2px 10px 8px; border-radius:999px; overflow:hidden; }
+  .combobar i { display:block; height:100%; width:0; border-radius:999px; background:#FF8A3D; transition:width .2s; }
+  canvas { display:block; margin:0 auto; touch-action:manipulation; }
+  .tools { display:flex; gap:8px; padding:10px 4px 0; }
+  button { font-family:"Jua",sans-serif; font-size:17px; border:2px solid var(--line); border-radius:12px; background:#fff; color:var(--ink); padding:10px 0; flex:1; cursor:pointer; }
+  button:disabled { opacity:.4; }
+  button.main { background:var(--line); color:#fff; }
+  .toast { position:fixed; left:50%; top:40%; transform:translate(-50%,-50%); background:rgba(31,31,34,.86); color:#fff; font-family:"Jua",sans-serif; font-size:22px; padding:10px 20px; border-radius:14px; pointer-events:none; opacity:0; transition:opacity .2s; z-index:6; }
+  .toast.on { opacity:1; }
+  .combo { position:fixed; left:50%; top:30%; transform:translate(-50%,-50%) scale(0); font-family:"Jua",sans-serif; font-size:40px; color:#fff; white-space:nowrap; pointer-events:none; z-index:5;
+           -webkit-text-stroke:2px #2a2420; text-shadow:0 4px 0 #2a2420; opacity:0; }
+  .combo small { display:block; font-size:22px; text-align:center; margin-top:-4px; }
+  .combo.go { animation:comboPop .9s ease-out forwards; }
+  @keyframes comboPop { 0% { transform:translate(-50%,-50%) scale(.3) rotate(-8deg); opacity:0; } 18% { transform:translate(-50%,-50%) scale(1.25) rotate(4deg); opacity:1; }
+                        32% { transform:translate(-50%,-50%) scale(.95) rotate(-2deg); } 45% { transform:translate(-50%,-50%) scale(1.05) rotate(0); } 75% { opacity:1; } 100% { transform:translate(-50%,-62%) scale(1); opacity:0; } }
+  .shake1 { animation:shake .25s; } .shake2 { animation:shake2 .3s; }
+  @keyframes shake { 0%,100% { transform:translate(0,0); } 25% { transform:translate(-2px,1px); } 50% { transform:translate(2px,-1px); } 75% { transform:translate(-1px,1px); } }
+  @keyframes shake2 { 0%,100% { transform:translate(0,0); } 20% { transform:translate(-5px,2px) rotate(-.6deg); } 40% { transform:translate(5px,-2px) rotate(.6deg); } 60% { transform:translate(-3px,1px); } 80% { transform:translate(3px,-1px); } }
+  .modal { position:fixed; inset:0; background:rgba(20,18,16,.55); display:none; align-items:center; justify-content:center; padding:16px; z-index:7; }
+  .modal.open { display:flex; }
+  .box { background:var(--cream); border:3px solid var(--line); border-radius:18px; padding:22px 18px 18px; width:100%; max-width:360px; text-align:center; }
+  .box h2 { font-family:"Jua",sans-serif; font-weight:400; font-size:28px; margin:0 0 10px; }
+  .box p { font-size:14px; line-height:1.65; margin:0 0 8px; }
+  .box .big { font-family:"Jua",sans-serif; font-size:44px; margin:6px 0 2px; }
+  .box .muted { color:var(--muted); font-size:12px; }
+  .box button { margin-top:12px; width:100%; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>트라이피크<span class="tag">시험판</span></h1></header>
+  <div class="hud">
+    <div class="stat"><b id="round">1</b><span>판</span></div>
+    <div class="stat"><b id="score">0</b><span>점수</span></div>
+    <div class="stat"><b id="left">28</b><span>남은 카드</span></div>
+    <div class="stat"><b id="stockN">23</b><span>더미</span></div>
+  </div>
+  <div class="combobar"><i id="comboFill"></i></div>
+  <canvas id="board"></canvas>
+  <div class="tools">
+    <button id="undoBtn">되돌리기 1</button>
+    <button id="restartBtn">처음부터</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="combo" id="combo"></div>
+
+<div class="modal open" id="startBox"><div class="box">
+  <h2>트라이피크</h2>
+  <p>아래 펼친 카드보다 숫자가 <b>하나 크거나 하나 작은</b> 카드를 봉우리에서 눌러서 가져와</p>
+  <p>K 다음엔 A, A 다음엔 K도 돼. 가져올 게 없으면 왼쪽 더미를 눌러 새 카드를 펼쳐</p>
+  <p>연달아 가져올수록 점수가 커지고, 봉우리 꼭대기를 깨면 보너스</p>
+  <p class="muted">시험판이라 점수는 아직 저장되지 않아</p>
+  <button class="main" id="startBtn">시작</button>
+</div></div>
+
+<div class="modal" id="clearBox"><div class="box">
+  <h2 id="clearTitle">1판 다 깼다</h2>
+  <p id="clearDetail"></p>
+  <button class="main" id="nextBtn">다음 판</button>
+</div></div>
+
+<div class="modal" id="endBox"><div class="box">
+  <h2>더 가져올 카드가 없어</h2>
+  <div class="big" id="endScore">0점</div>
+  <p id="endDetail"></p>
+  <p class="muted" id="endBest"></p>
+  <p class="muted">광장이 열리면 이 점수가 모두의 점수에 더해질 예정이야</p>
+  <button class="main" id="againBtn">처음부터 다시</button>
+</div></div>
+
+<div id="err" style="display:none;position:fixed;left:0;right:0;bottom:0;background:#e8402f;color:#fff;font-size:12px;padding:6px 10px;z-index:9"></div>
+<script>
+  // 카카오톡·인스타 같은 앱 안 브라우저(옛 안드로이드 웹뷰, iOS 15 이하)에는 둥근 사각형 그리기가 없음 → 직접 채워 넣음
+  if (location.search.includes('oldtest')) { delete CanvasRenderingContext2D.prototype.roundRect; window.PointerEvent = undefined; }   // 옛 브라우저 흉내 (시험용)
+  if (window.CanvasRenderingContext2D && !CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+      r = Math.max(0, Math.min(typeof r === 'number' ? r : (r && r[0]) || 0, Math.abs(w) / 2, Math.abs(h) / 2));
+      this.moveTo(x + r, y); this.lineTo(x + w - r, y); this.arcTo(x + w, y, x + w, y + r, r);
+      this.lineTo(x + w, y + h - r); this.arcTo(x + w, y + h, x + w - r, y + h, r);
+      this.lineTo(x + r, y + h); this.arcTo(x, y + h, x, y + h - r, r);
+      this.lineTo(x, y + r); this.arcTo(x, y, x + r, y, r); this.closePath();
+    };
+  }
+  window.addEventListener('error', (e) => { const el = document.getElementById('err'); el.style.display = 'block'; el.textContent = '오류: ' + (e.message || e.type); });
+</script>
+<script src="../pets.js?v=26"></script>
+<script>
+(() => {
+  // ---------- 카드 ----------
+  // 무늬 4개: 뼈다귀·생선·발바닥·하트. J·Q·K는 강아지·고양이 얼굴
+  const SUITS = [
+    { name: 'bone', color: '#8A5C37' }, { name: 'fish', color: '#2F7FB8' },
+    { name: 'paw', color: '#D9577E' }, { name: 'heart', color: '#E8402F' },
+  ];
+  const RANK_TXT = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const FACE = { 11: '시바', 12: '삼색이', 13: '골든리트리버' };
+  const faceIdx = (r) => BREEDS.findIndex((b) => b.name === FACE[r]);
+
+  // ---------- 봉우리 3개 배치: 맨 위 3장, 6장, 9장, 맨 아래 10장 = 28장 ----------
+  const SLOTS = [];
+  for (let p = 0; p < 3; p++) SLOTS.push({ row: 0, x: 3 * p + 1.5 });
+  for (let p = 0; p < 3; p++) for (let j = 0; j < 2; j++) SLOTS.push({ row: 1, x: 3 * p + 1 + j });
+  for (let i = 0; i < 9; i++) SLOTS.push({ row: 2, x: i + 0.5 });
+  for (let i = 0; i < 10; i++) SLOTS.push({ row: 3, x: i });
+  SLOTS.forEach((s, i) => { s.i = i; s.cover = []; });
+  SLOTS.forEach((s) => { SLOTS.forEach((o) => { if (o.row === s.row + 1 && Math.abs(o.x - s.x) === 0.5) s.cover.push(o.i); }); });
+
+  // ---------- 화면 크기 ----------
+  const cv = document.getElementById('board'), g = cv.getContext('2d');
+  let W, H, dpr, cw, ch, sx, sy, top0, baseY, wasteX, stockX;
+  function layout() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = Math.min(window.innerWidth, 480) - 16;
+    cw = Math.floor(W / 7.2); ch = Math.round(cw * 1.42);   // 맨 아래 10장이 옆 카드와 조금 겹칠 만큼 크게 (숫자는 왼쪽 위라 안 가림)
+    sx = (W - 12 - cw) / 9; sy = Math.round(ch * 0.48);
+    top0 = 10; baseY = top0 + sy * 3 + ch + 34;
+    stockX = W / 2 - cw * 1.9; wasteX = W / 2 + cw * 0.3;
+    H = baseY + ch * 1.25 + 26;
+    cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    cardCache = {};
+  }
+  const slotPos = (s) => ({ x: 6 + s.x * sx, y: top0 + s.row * sy });
+  const BIG = 1.2;   // 펼친 카드·더미는 조금 크게
+
+  // ---------- 상태 ----------
+  let tab, stock, waste, score, streak, bestStreak, round, running, undoLeft, history, anims = [], parts = [], floats = [], lastPlay = -1e9;
+  function shuffled() {
+    const d = []; for (let s = 0; s < 4; s++) for (let r = 1; r <= 13; r++) d.push({ r, s });
+    for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
+    return d;
+  }
+  function deal() {
+    const d = shuffled();
+    tab = SLOTS.map((s) => ({ card: d.pop(), gone: false }));
+    waste = [d.pop()]; stock = d;
+    streak = 0; history = []; undoLeft = 1; anims = [];
+  }
+  const open = (i) => !tab[i].gone && SLOTS[i].cover.every((k) => tab[k].gone);
+  const fits = (a, b) => { const d = Math.abs(a.r - b.r); return d === 1 || d === 12; };   // K와 A도 이어짐
+  const top = () => waste[waste.length - 1];
+  const leftCards = () => tab.filter((t) => !t.gone).length;
+  const playable = () => tab.map((_, i) => i).filter((i) => open(i) && fits(tab[i].card, top()));
+
+  // ---------- 누르기 ----------
+  // 한 번 누르면 브라우저가 pointer·touch·mouse 신호를 겹쳐 보내기도 함 → 종류가 다른 신호가 같은 자리에 곧바로 오면 무시
+  // (같은 종류 신호는 빠른 연타라서 그대로 받음)
+  let lastTap = { at: 0, x: -99, y: -99, src: '' };
+  function onTap(x, y, src) {
+    const now = Date.now();
+    if (src !== lastTap.src && now - lastTap.at < 600 && Math.abs(x - lastTap.x) < 15 && Math.abs(y - lastTap.y) < 15) return;
+    lastTap = { at: now, x, y, src };
+    tapAt(x, y); dirty = true;
+  }
+  if (window.PointerEvent) cv.addEventListener('pointerdown', (e) => { e.preventDefault(); onTap(e.clientX, e.clientY, 'p'); });
+  cv.addEventListener('touchstart', (e) => { e.preventDefault(); const t = e.changedTouches[0]; onTap(t.clientX, t.clientY, 't'); }, { passive: false });
+  cv.addEventListener('mousedown', (e) => onTap(e.clientX, e.clientY, 'm'));
+  function tapAt(clientX, clientY) {
+    const t0 = performance.now();
+    if (!running || anims.some((a) => t0 < a.at + a.dur)) return;   // 카드가 날아가는 중엔 잠깐 기다림
+    const rect = cv.getBoundingClientRect(), x = clientX - rect.left, y = clientY - rect.top;
+    // 위에 놓인 카드부터 확인 (아래 줄이 위 줄을 덮음)
+    for (let i = SLOTS.length - 1; i >= 0; i--) {
+      if (tab[i].gone) continue;
+      const p = slotPos(SLOTS[i]);
+      if (x >= p.x && x <= p.x + cw && y >= p.y && y <= p.y + ch) {
+        if (!open(i)) return;
+        if (!fits(tab[i].card, top())) { nope(i); return; }
+        return play(i);
+      }
+    }
+    const sy0 = baseY, sw = cw * BIG, shh = ch * BIG;
+    if (x >= stockX && x <= stockX + sw && y >= sy0 && y <= sy0 + shh) flip();
+  }
+  function nope(i) { wiggle = { i, at: performance.now() }; }
+  let wiggle = null;
+
+  function play(i) {
+    const now = performance.now();
+    history.push({ type: 'play', i, streak, score });
+    const card = tab[i].card, from = slotPos(SLOTS[i]);
+    tab[i].gone = true; waste.push(card);
+    streak += 1; lastPlay = now;   // 더미를 뒤집으면 0으로
+    const gain = 10 + Math.min(streak - 1, 10) * 5;
+    score += gain;
+    anims.push({ card, fx: from.x, fy: from.y, fs: 1, tx: wasteX, ty: baseY, ts: BIG, at: now, dur: 200, faceUp: true });
+    burst(from.x + cw / 2, from.y + ch / 2, streak - 1, gain, now, card);
+    if (SLOTS[i].row === 0) { score += 50; floats.push({ x: from.x + cw / 2, y: from.y + ch + 6, text: '봉우리 +50', born: now, cb: 6, size: 20 }); }
+    bestStreak = Math.max(bestStreak, streak);
+    updateHud();
+    if (!leftCards()) setTimeout(clearRound, 450);
+    else setTimeout(checkStuck, 260);
+  }
+  function flip() {
+    if (!stock.length) { checkStuck(); return; }
+    const now = performance.now();
+    history.push({ type: 'flip', streak, score });
+    const card = stock.pop(); waste.push(card);
+    streak = 0;
+    anims.push({ card, fx: stockX, fy: baseY, fs: BIG, tx: wasteX, ty: baseY, ts: BIG, at: now, dur: 220, faceUp: true, flip: true });
+    updateHud(); setTimeout(checkStuck, 260);
+  }
+  document.getElementById('undoBtn').onclick = () => {
+    if (!running || undoLeft <= 0 || !history.length || anims.some((a) => performance.now() < a.at + a.dur)) return;
+    const h = history.pop(), card = waste.pop();
+    if (h.type === 'play') tab[h.i].gone = false; else stock.push(card);
+    streak = h.streak; score = h.score; undoLeft--; lastPlay = -1e9;
+    toast('한 번 되돌렸어'); updateHud();
+  };
+  function checkStuck() {
+    if (!running || stock.length || playable().length) return;
+    running = false;
+    const best = bestScore();
+    document.getElementById('endScore').textContent = `${score}점`;
+    document.getElementById('endDetail').textContent = `${round}판까지 · 최고 ${bestStreak}연속`;
+    document.getElementById('endBest').textContent = score > best ? '내 최고 기록' : `내 최고 기록 ${best}점`;
+    setTimeout(() => document.getElementById('endBox').classList.add('open'), 500);
+  }
+  function clearRound() {
+    running = false;
+    const bonus = 200 + stock.length * 20;
+    score += bonus; updateHud(); confetti(performance.now());
+    document.getElementById('clearTitle').textContent = `${round}판 다 깼다`;
+    document.getElementById('clearDetail').textContent = `다 깬 보너스 200 + 남은 더미 ${stock.length}장 x 20 = ${bonus}점 · 지금 ${score}점`;
+    setTimeout(() => document.getElementById('clearBox').classList.add('open'), 600);
+  }
+  function bestScore() { let best = 0; try { best = +localStorage.getItem('doduk-peaks-best') || 0; if (score > best) localStorage.setItem('doduk-peaks-best', score); } catch {} return best; }
+
+  document.getElementById('startBtn').onclick = () => { document.getElementById('startBox').classList.remove('open'); start(); };
+  document.getElementById('restartBtn').onclick = () => start();
+  document.getElementById('againBtn').onclick = () => { document.getElementById('endBox').classList.remove('open'); start(); };
+  document.getElementById('nextBtn').onclick = () => { document.getElementById('clearBox').classList.remove('open'); round++; deal(); running = true; updateHud(); toast(`${round}판`); };
+  function start() { score = 0; round = 1; bestStreak = 0; deal(); running = true; updateHud(); }
+
+  function updateHud() {
+    dirty = true;
+    document.getElementById('round').textContent = round;
+    document.getElementById('score').textContent = score;
+    document.getElementById('left').textContent = leftCards();
+    document.getElementById('stockN').textContent = stock.length;
+    document.getElementById('undoBtn').textContent = `되돌리기 ${undoLeft}`;
+    document.getElementById('undoBtn').disabled = undoLeft <= 0;
+    const cf = document.getElementById('comboFill');
+    cf.style.width = streak >= 2 ? `${Math.min(100, streak * 10)}%` : '0';
+    cf.style.background = tierColor(streak - 1, performance.now());
+  }
+  let toastTimer;
+  function toast(t) { const el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 800); }
+
+  // ---------- 효과 (사천성과 같은 방식: 연달아 가져올수록 많이, 크게) ----------
+  const PALETTE = ['#FF7FA8', '#FFC531', '#7BC67E', '#5BC0EB', '#FF8A3D', '#B79CED'];
+  const COMBO_WORDS = [[10, '멈출 수가 없어'], [7, '전설의 집사'], [5, '최고야'], [3, '신난다'], [1, '좋아']];
+  function tierColor(cb, now) {
+    if (cb >= 7) return `hsl(${Math.round(now / 4) % 360},90%,60%)`;
+    return cb >= 5 ? '#5BC0EB' : cb >= 3 ? '#FFC531' : cb >= 1 ? '#FF8A3D' : '#E8402F';
+  }
+  function burst(x, y, cb, gain, now, card) {
+    const own = SUITS[card.s].name === 'heart' ? 'heart' : SUITS[card.s].name;
+    const types = cb >= 5 ? ['heart', 'star', 'paw', own] : cb >= 2 ? ['heart', 'paw', own] : ['paw', own];
+    const n = Math.min(26, 5 + cb * 3);
+    for (let i = 0; i < n; i++) {
+      const ang = Math.random() * Math.PI * 2, sp = (1.2 + Math.random() * 2.2) * (1 + Math.min(cb, 8) * 0.12);
+      parts.push({ x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 1.6, g: 0.09, born: now, life: 650 + Math.random() * 400,
+        type: types[i % types.length], color: PALETTE[(i + cb) % PALETTE.length], size: 6 + Math.random() * 5 + Math.min(cb, 6), rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.3 });
+    }
+    if (parts.length > 240) parts.splice(0, parts.length - 240);
+    floats.push({ x, y, text: `+${gain}`, born: now, cb, size: 18 + Math.min(cb, 6) * 2 });
+    if (cb >= 1) showCombo(cb, now);
+    if (cb >= 4) shake(cb >= 7 ? 2 : 1);
+  }
+  function confetti(now) {
+    for (let i = 0; i < 90; i++) parts.push({ x: Math.random() * W, y: -10 - Math.random() * 80, vx: (Math.random() - 0.5) * 1.5, vy: 1 + Math.random() * 2, g: 0.03, born: now,
+      life: 1700 + Math.random() * 900, type: ['star', 'heart', 'paw', 'rect'][i % 4], color: PALETTE[i % PALETTE.length], size: 6 + Math.random() * 6, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.25 });
+    dirty = true;
+  }
+  function showCombo(cb, now) {
+    const el = document.getElementById('combo');
+    el.innerHTML = `${cb + 1}연속<small>${COMBO_WORDS.find(([k]) => cb >= k)[1]}</small>`;
+    el.style.fontSize = `${34 + Math.min(cb, 10) * 3}px`;
+    el.style.color = cb >= 7 ? '#FFD54A' : tierColor(cb, now);
+    el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+  }
+  function shake(level) { const w = document.querySelector('.wrap'); w.classList.remove('shake1', 'shake2'); void w.offsetWidth; w.classList.add(level === 2 ? 'shake2' : 'shake1'); }
+
+  // 작은 그림: 하트, 별, 발바닥, 뼈다귀, 생선 (카드 무늬와 효과에 같이 씀)
+  function shape(q, type, s, color, outline = true) {
+    q.fillStyle = color; q.strokeStyle = '#2a2420'; q.lineWidth = Math.max(1, s * 0.12);
+    q.beginPath();
+    if (type === 'heart') { q.moveTo(0, s * 0.8); q.bezierCurveTo(-s * 1.6, -s * 0.2, -s * 0.7, -s * 1.4, 0, -s * 0.45); q.bezierCurveTo(s * 0.7, -s * 1.4, s * 1.6, -s * 0.2, 0, s * 0.8); q.fill(); if (outline) q.stroke(); }
+    else if (type === 'star') { for (let i = 0; i < 10; i++) { const r = i % 2 ? s * 0.45 : s, a = (i / 10) * Math.PI * 2 - Math.PI / 2; q.lineTo(Math.cos(a) * r, Math.sin(a) * r); } q.closePath(); q.fill(); if (outline) q.stroke(); }
+    else if (type === 'paw') {
+      q.ellipse(0, s * 0.25, s * 0.55, s * 0.45, 0, 0, Math.PI * 2); q.fill(); if (outline) q.stroke();
+      for (const [dx, dy] of [[-0.6, -0.35], [-0.2, -0.7], [0.2, -0.7], [0.6, -0.35]]) { q.beginPath(); q.arc(dx * s, dy * s, s * 0.2, 0, Math.PI * 2); q.fill(); if (outline) q.stroke(); }
+    }
+    else if (type === 'bone') {
+      q.rect(-s * 0.7, -s * 0.18, s * 1.4, s * 0.36); q.fill(); if (outline) q.stroke();
+      for (const [dx, dy] of [[-0.75, -0.2], [-0.75, 0.2], [0.75, -0.2], [0.75, 0.2]]) { q.beginPath(); q.arc(dx * s, dy * s, s * 0.24, 0, Math.PI * 2); q.fill(); if (outline) q.stroke(); }
+    }
+    else if (type === 'fish') {
+      q.ellipse(-s * 0.15, 0, s * 0.75, s * 0.42, 0, 0, Math.PI * 2); q.fill(); if (outline) q.stroke();
+      q.beginPath(); q.moveTo(s * 0.45, 0); q.lineTo(s * 1.0, -s * 0.4); q.lineTo(s * 1.0, s * 0.4); q.closePath(); q.fill(); if (outline) q.stroke();
+      q.beginPath(); q.fillStyle = '#fff'; q.arc(-s * 0.55, -s * 0.08, s * 0.1, 0, Math.PI * 2); q.fill();
+    }
+    else { q.rect(-s * 0.35, -s * 0.6, s * 0.7, s * 1.2); q.fill(); }
+  }
+
+  // ---------- 카드 그림 (한 번 그려 두고 복사) ----------
+  let cardCache = {};
+  function cardImage(card, scale, back) {
+    const key = back ? `b${scale}` : `${card.r}-${card.s}-${scale}`;
+    if (cardCache[key]) return cardCache[key];
+    const w = cw * scale, h = ch * scale;
+    const c = document.createElement('canvas'); c.width = Math.ceil(w * dpr); c.height = Math.ceil(h * dpr);
+    const q = c.getContext('2d'); q.scale(dpr, dpr);
+    q.fillStyle = 'rgba(42,36,32,.2)'; q.beginPath(); q.roundRect(1, 2, w - 2, h - 2, w * 0.12); q.fill();
+    q.lineWidth = 1.6; q.strokeStyle = '#2a2420';
+    if (back) {
+      q.fillStyle = '#C9965F'; q.beginPath(); q.roundRect(1, 0.5, w - 2, h - 2.5, w * 0.12); q.fill(); q.stroke();
+      q.strokeStyle = 'rgba(255,246,230,.7)'; q.lineWidth = 1.2; q.beginPath(); q.roundRect(w * 0.12, h * 0.09, w * 0.76, h * 0.8, w * 0.08); q.stroke();
+      q.save(); q.translate(w / 2, h * 0.5); shape(q, 'paw', w * 0.22, 'rgba(255,246,230,.85)', false); q.restore();
+      return (cardCache[key] = c);
+    }
+    q.fillStyle = '#FFFDF8'; q.beginPath(); q.roundRect(1, 0.5, w - 2, h - 2.5, w * 0.12); q.fill(); q.stroke();
+    const suit = SUITS[card.s];
+    // 왼쪽 위: 숫자 + 작은 무늬
+    q.fillStyle = suit.color; q.font = `${Math.round(w * 0.42)}px Jua`; q.textAlign = 'left'; q.textBaseline = 'top';
+    q.fillText(RANK_TXT[card.r], w * 0.1, h * 0.05);
+    q.save(); q.translate(w * 0.22, h * 0.42); shape(q, suit.name, w * 0.13, suit.color, false); q.restore();
+    // 가운데: 그림카드는 얼굴, 나머지는 큰 무늬
+    if (card.r >= 11) {
+      const b = BREEDS[faceIdx(card.r)];
+      const headR = b.headR ?? 16, snout = b.snout ?? (b.kind === 'dog' ? 7 : 0);
+      const k = Math.min((w * 0.62) / (headR * 1.9 + snout + 6), (h * 0.5) / (headR * 2 + 16));
+      q.save(); q.translate(w * 0.6, h * 0.66); q.scale(k, k);
+      q.lineWidth = 2.4; q.strokeStyle = '#2a2420'; q.lineJoin = 'round'; q.lineCap = 'round';
+      drawHead(q, b, -(snout - headR * 0.17) / 2, 7, headR, b.head ?? b.base, snout, 0.3, faceIdx(card.r));
+      q.restore();
+    } else {
+      q.save(); q.translate(w * 0.62, h * 0.68); shape(q, suit.name, w * 0.26, suit.color, true); q.restore();
+    }
+    return (cardCache[key] = c);
+  }
+
+  // ---------- 그리기 ----------
+  let dirty = true;
+  function frame(now) {
+    try {
+      anims = anims.filter((a) => now < a.at + a.dur + 30);
+      if (wiggle && now - wiggle.at > 300) { wiggle = null; dirty = true; }
+      const animating = anims.length || parts.length || floats.length || wiggle;
+      if (dirty || animating) { draw(now); dirty = false; }
+    } catch (e) { const el = document.getElementById('err'); el.style.display = 'block'; el.textContent = '오류: ' + e.message; }
+    requestAnimationFrame(frame);
+  }
+  function draw(now) {
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = '#5E9E6E'; g.beginPath(); g.roundRect(0, 0, W, H, 16); g.fill();   // 초록 펠트
+    g.fillStyle = 'rgba(255,255,255,.06)'; for (let i = 0; i < 40; i++) { g.beginPath(); g.arc((i * 97) % W, (i * 53) % H, 2, 0, Math.PI * 2); g.fill(); }
+    if (!tab) return;
+    const flying = new Set(anims.map((a) => a.card));
+    const hintOk = running ? playable() : [];
+    // 봉우리
+    for (let i = 0; i < SLOTS.length; i++) {
+      if (tab[i].gone) continue;
+      const p = slotPos(SLOTS[i]), isOpen = open(i);
+      let dx = 0;
+      if (wiggle && wiggle.i === i) dx = Math.sin((now - wiggle.at) / 25) * 3 * (1 - (now - wiggle.at) / 300);
+      g.drawImage(cardImage(tab[i].card, 1, !isOpen), p.x + dx, p.y, cw, ch);
+      if (isOpen && hintOk.includes(i) && stock.length === 0) { g.strokeStyle = '#FFD54A'; g.lineWidth = 3; g.beginPath(); g.roundRect(p.x - 1, p.y - 1, cw + 2, ch, cw * 0.12); g.stroke(); }
+    }
+    // 더미 (남은 장 수만큼 살짝 겹쳐 보이게)
+    const bw = cw * BIG, bh = ch * BIG;
+    if (stock.length) {
+      for (let k = Math.min(4, stock.length) - 1; k >= 0; k--) g.drawImage(cardImage(null, BIG, true), stockX - k * 2, baseY - k * 2, bw, bh);
+      if (!playable().length && running) { g.strokeStyle = `rgba(255,213,74,${0.5 + 0.5 * Math.sin(now / 150)})`; g.lineWidth = 4; g.beginPath(); g.roundRect(stockX - 3, baseY - 3, bw + 6, bh + 4, cw * 0.15); g.stroke(); dirty = true; }
+    } else {
+      g.strokeStyle = 'rgba(255,255,255,.4)'; g.setLineDash([5, 5]); g.lineWidth = 2; g.beginPath(); g.roundRect(stockX, baseY, bw, bh, cw * 0.12); g.stroke(); g.setLineDash([]);
+    }
+    g.fillStyle = '#fff'; g.font = '15px Jua'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    g.fillText(`더미 ${stock.length}`, stockX + bw / 2, baseY + bh + 18);
+    // 펼친 카드 (날아오는 중이면 그 아래 카드를 보여줌)
+    let wi = waste.length - 1; while (wi >= 0 && flying.has(waste[wi])) wi--;
+    if (wi >= 0) g.drawImage(cardImage(waste[wi], BIG), wasteX, baseY, bw, bh);
+    // 날아가는 카드
+    for (const a of anims) {
+      const k = Math.min(1, Math.max(0, (now - a.at) / a.dur)), e = 1 - (1 - k) * (1 - k);
+      const x = a.fx + (a.tx - a.fx) * e, y = a.fy + (a.ty - a.fy) * e - Math.sin(k * Math.PI) * 30;
+      const s = a.fs + (a.ts - a.fs) * e;
+      if (a.flip && k < 0.5) { const sq = 1 - k * 2; g.drawImage(cardImage(null, BIG, true), x + (cw * s) * (1 - sq) / 2, y, cw * s * sq, ch * s); }
+      else if (a.flip) { const sq = (k - 0.5) * 2; g.drawImage(cardImage(a.card, BIG), x + (cw * s) * (1 - sq) / 2, y, cw * s * sq, ch * s); }
+      else g.drawImage(cardImage(a.card, BIG), x, y, cw * s, ch * s);
+    }
+    drawEffects(now);
+  }
+  function drawEffects(now) {
+    parts = parts.filter((p) => now - p.born < p.life);
+    for (const p of parts) {
+      const age = now - p.born, k = age / 16.7;
+      g.save(); g.globalAlpha = Math.min(1, (p.life - age) / 250);
+      g.translate(p.x + p.vx * k, p.y + p.vy * k + 0.5 * p.g * k * k); g.rotate(p.rot + p.vr * k);
+      const pop = age < 120 ? 0.4 + (age / 120) * 0.6 : 1;
+      const col = p.type === 'bone' ? '#FFF6E6' : p.type === 'fish' ? '#8FCFF0' : p.color;
+      shape(g, p.type, p.size * pop * 0.7, col, true);
+      g.restore();
+    }
+    floats = floats.filter((f) => now - f.born < 800);
+    for (const f of floats) {
+      const k = (now - f.born) / 800;
+      g.save(); g.globalAlpha = 1 - k * k; g.font = `${f.size}px Jua`; g.textAlign = 'center';
+      g.lineWidth = 4; g.strokeStyle = '#2a2420'; g.strokeText(f.text, f.x, f.y - 10 - k * 34);
+      g.fillStyle = f.cb >= 1 ? tierColor(f.cb, now) : '#fff'; g.fillText(f.text, f.x, f.y - 10 - k * 34);
+      g.restore();
+    }
+  }
+
+  layout(); deal(); score = 0; round = 1; bestStreak = 0; running = false; updateHud();
+  let lastW = window.innerWidth;
+  addEventListener('resize', () => { if (window.innerWidth !== lastW) { lastW = window.innerWidth; layout(); dirty = true; } });
+  requestAnimationFrame(frame);
+  window.__peaks = { get tab() { return tab; }, get stock() { return stock; }, get waste() { return waste; }, playable, play, flip, open, get score() { return score; }, get running() { return running; }, frame, slotPos, SLOTS };   // 시험용
+})();
+</script>
+</body>
+</html>
