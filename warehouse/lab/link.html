@@ -18,6 +18,17 @@
   .timebar { height:12px; margin:0 4px 8px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; }
   .timebar i { display:block; height:100%; width:100%; background:#7BC67E; transition:width .25s linear, background .3s; }
   .timebar i.low { background:var(--red); }
+  .combobar { height:6px; margin:-4px 10px 8px; border-radius:999px; background:transparent; overflow:hidden; }
+  .combobar i { display:block; height:100%; width:0; border-radius:999px; background:#FF8A3D; }
+  .combo { position:fixed; left:50%; top:34%; transform:translate(-50%,-50%) scale(0); font-family:"Jua",sans-serif; font-size:40px; color:#fff; white-space:nowrap; pointer-events:none; z-index:5;
+           -webkit-text-stroke:2px #2a2420; text-shadow:0 4px 0 #2a2420; opacity:0; }
+  .combo small { display:block; font-size:22px; text-align:center; margin-top:-4px; }
+  .combo.go { animation:comboPop .9s ease-out forwards; }
+  @keyframes comboPop { 0% { transform:translate(-50%,-50%) scale(.3) rotate(-8deg); opacity:0; } 18% { transform:translate(-50%,-50%) scale(1.25) rotate(4deg); opacity:1; }
+                        32% { transform:translate(-50%,-50%) scale(.95) rotate(-2deg); } 45% { transform:translate(-50%,-50%) scale(1.05) rotate(0); } 75% { opacity:1; } 100% { transform:translate(-50%,-62%) scale(1); opacity:0; } }
+  .shake1 { animation:shake .25s; } .shake2 { animation:shake2 .3s; }
+  @keyframes shake { 0%,100% { transform:translate(0,0); } 25% { transform:translate(-2px,1px); } 50% { transform:translate(2px,-1px); } 75% { transform:translate(-1px,1px); } }
+  @keyframes shake2 { 0%,100% { transform:translate(0,0); } 20% { transform:translate(-5px,2px) rotate(-.6deg); } 40% { transform:translate(5px,-2px) rotate(.6deg); } 60% { transform:translate(-3px,1px); } 80% { transform:translate(3px,-1px); } }
   .stat { flex:1; background:#fff; border:2px solid var(--line); border-radius:12px; padding:5px 0; text-align:center; }
   .stat b { display:block; font-family:"Jua",sans-serif; font-size:20px; font-weight:400; }
   .stat span { font-size:11px; color:var(--muted); }
@@ -48,6 +59,7 @@
     <div class="stat"><b id="left">24</b><span>남은 짝</span></div>
   </div>
   <div class="timebar"><i id="timeFill"></i></div>
+  <div class="combobar"><i id="comboFill"></i></div>
   <canvas id="board"></canvas>
   <div class="tools">
     <button id="hintBtn">힌트 3</button>
@@ -56,6 +68,7 @@
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<div class="combo" id="combo"></div>
 
 <div class="modal open" id="startBox"><div class="box">
   <h2>사천성</h2>
@@ -216,9 +229,10 @@
     const now = performance.now();
     const kind = grid[a[0]][a[1]];
     combo = now - lastMatch < 2500 ? combo + 1 : 0; lastMatch = now;
-    score += 10 + Math.min(combo, 5) * 5;   // 콤보 보너스는 최대 +25
-    if (combo > 0) toast(`콤보 ${combo}`);
-    pathFx = { path, until: now + 320 };
+    const gain = 10 + Math.min(combo, 5) * 5;   // 콤보 보너스는 최대 +25
+    score += gain;
+    burst(a, b, kind, combo, gain, now);
+    pathFx = { path, until: now + 320 + Math.min(combo, 8) * 30, combo };
     pops.push({ r: a[0], c: a[1], kind, at: now }, { r: b[0], c: b[1], kind, at: now });
     grid[a[0]][a[1]] = null; grid[b[0]][b[1]] = null;
     sel = null; hint = null;
@@ -250,6 +264,7 @@
     const left = Math.max(0, Math.ceil((deadline - performance.now()) / 1000));
     const bonus = left * 5;
     score += bonus;
+    confetti(performance.now());
     hintsLeft = Math.min(5, hintsLeft + 1); shufflesLeft = Math.min(3, shufflesLeft + 1);
     updateHud();
     const next = stageInfo(stage + 1);
@@ -326,6 +341,86 @@
   let toastTimer;
   function toast(t) { const el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 700); }
 
+  // ---------- 효과: 연속으로 맞출수록 더 많이, 더 크게 ----------
+  let parts = [], floats = [];
+  const PALETTE = ['#FF7FA8', '#FFC531', '#7BC67E', '#5BC0EB', '#FF8A3D', '#B79CED'];
+  const COMBO_WORDS = [[10, '멈출 수가 없어'], [7, '전설의 집사'], [5, '최고야'], [3, '신난다'], [1, '좋아']];
+  function tierColor(cb, now) {
+    if (cb >= 7) return `hsl(${Math.round(now / 4) % 360},90%,60%)`;   // 무지개
+    return cb >= 5 ? '#5BC0EB' : cb >= 3 ? '#FFC531' : cb >= 1 ? '#FF8A3D' : '#E8402F';
+  }
+  function burst(a, b, kind, cb, gain, now) {
+    const treat = BREEDS[breedIdx[kind]].kind === 'cat' ? 'fish' : 'bone';
+    const types = cb >= 5 ? ['heart', 'star', 'paw', treat] : cb >= 2 ? ['heart', 'paw', treat] : ['paw', 'heart'];
+    const n = Math.min(18, 3 + cb * 2);   // 타일 하나당
+    for (const [r, c] of [a, b]) {
+      for (let i = 0; i < n; i++) {
+        const ang = Math.random() * Math.PI * 2, sp = (1.2 + Math.random() * 2.2) * (1 + Math.min(cb, 8) * 0.12);
+        parts.push({ x: px(c), y: py(r), vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 1.6, g: 0.09, born: now, life: 650 + Math.random() * 400,
+          type: types[i % types.length], color: PALETTE[(i + cb) % PALETTE.length], size: 6 + Math.random() * 5 + Math.min(cb, 6), rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.3 });
+      }
+    }
+    if (parts.length > 240) parts.splice(0, parts.length - 240);
+    floats.push({ x: (px(a[1]) + px(b[1])) / 2, y: (py(a[0]) + py(b[0])) / 2, text: `+${gain}`, born: now, cb, size: 18 + Math.min(cb, 6) * 2 });
+    if (cb >= 1) showCombo(cb, now);
+    if (cb >= 4) shake(cb >= 7 ? 2 : 1);
+  }
+  function confetti(now) {   // 단계 성공: 위에서 쏟아짐
+    for (let i = 0; i < 90; i++) parts.push({ x: Math.random() * W, y: -10 - Math.random() * 80, vx: (Math.random() - 0.5) * 1.5, vy: 1 + Math.random() * 2, g: 0.03, born: now,
+      life: 1700 + Math.random() * 900, type: ['star', 'heart', 'paw', 'rect'][i % 4], color: PALETTE[i % PALETTE.length], size: 6 + Math.random() * 6, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.25 });
+    dirty = true;
+  }
+  function showCombo(cb, now) {
+    const el = document.getElementById('combo');
+    el.innerHTML = `${cb + 1}연속<small>${COMBO_WORDS.find(([k]) => cb >= k)[1]}</small>`;
+    el.style.fontSize = `${34 + Math.min(cb, 10) * 3}px`;
+    el.style.color = cb >= 7 ? '#FFD54A' : tierColor(cb, now);
+    el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+  }
+  function shake(level) {
+    const w = document.querySelector('.wrap');
+    w.classList.remove('shake1', 'shake2'); void w.offsetWidth; w.classList.add(level === 2 ? 'shake2' : 'shake1');
+  }
+  function shape(q, p, s) {
+    q.fillStyle = p.color; q.strokeStyle = '#2a2420'; q.lineWidth = 1.4;
+    q.beginPath();
+    if (p.type === 'heart') { q.moveTo(0, s * 0.8); q.bezierCurveTo(-s * 1.6, -s * 0.2, -s * 0.7, -s * 1.4, 0, -s * 0.45); q.bezierCurveTo(s * 0.7, -s * 1.4, s * 1.6, -s * 0.2, 0, s * 0.8); q.fill(); q.stroke(); }
+    else if (p.type === 'star') { for (let i = 0; i < 10; i++) { const r = i % 2 ? s * 0.45 : s, a = (i / 10) * Math.PI * 2 - Math.PI / 2; q.lineTo(Math.cos(a) * r, Math.sin(a) * r); } q.closePath(); q.fill(); q.stroke(); }
+    else if (p.type === 'paw') {
+      q.ellipse(0, s * 0.25, s * 0.55, s * 0.45, 0, 0, Math.PI * 2); q.fill(); q.stroke();
+      for (const [dx, dy] of [[-0.6, -0.35], [-0.2, -0.7], [0.2, -0.7], [0.6, -0.35]]) { q.beginPath(); q.arc(dx * s, dy * s, s * 0.2, 0, Math.PI * 2); q.fill(); q.stroke(); }
+    }
+    else if (p.type === 'bone') {
+      q.fillStyle = '#FFF6E6'; q.rect(-s * 0.7, -s * 0.18, s * 1.4, s * 0.36); q.fill(); q.stroke();
+      for (const [dx, dy] of [[-0.75, -0.2], [-0.75, 0.2], [0.75, -0.2], [0.75, 0.2]]) { q.beginPath(); q.arc(dx * s, dy * s, s * 0.24, 0, Math.PI * 2); q.fill(); q.stroke(); }
+    }
+    else if (p.type === 'fish') {
+      q.fillStyle = '#8FCFF0'; q.ellipse(0, 0, s * 0.75, s * 0.42, 0, 0, Math.PI * 2); q.fill(); q.stroke();
+      q.beginPath(); q.moveTo(s * 0.6, 0); q.lineTo(s * 1.15, -s * 0.4); q.lineTo(s * 1.15, s * 0.4); q.closePath(); q.fill(); q.stroke();
+      q.beginPath(); q.fillStyle = '#2a2420'; q.arc(-s * 0.4, -s * 0.08, s * 0.09, 0, Math.PI * 2); q.fill();
+    }
+    else { q.rect(-s * 0.35, -s * 0.6, s * 0.7, s * 1.2); q.fill(); }
+  }
+  function drawEffects(now) {
+    parts = parts.filter((p) => now - p.born < p.life);
+    for (const p of parts) {
+      const age = now - p.born, k = age / 16.7;
+      const x = p.x + p.vx * k, y = p.y + p.vy * k + 0.5 * p.g * k * k;
+      g.save(); g.globalAlpha = Math.min(1, (p.life - age) / 250); g.translate(x, y); g.rotate(p.rot + p.vr * k);
+      const pop = age < 120 ? 0.4 + (age / 120) * 0.6 : 1;   // 처음에 톡 커짐
+      shape(g, p, p.size * pop / 2 * 1.4);
+      g.restore();
+    }
+    floats = floats.filter((f) => now - f.born < 800);
+    for (const f of floats) {
+      const k = (now - f.born) / 800;
+      g.save(); g.globalAlpha = 1 - k * k; g.font = `${f.size}px Jua`; g.textAlign = 'center';
+      g.lineWidth = 4; g.strokeStyle = '#2a2420'; g.strokeText(f.text, f.x, f.y - 10 - k * 34);
+      g.fillStyle = f.cb >= 1 ? tierColor(f.cb, now) : '#fff'; g.fillText(f.text, f.x, f.y - 10 - k * 34);
+      g.restore();
+    }
+  }
+
   // ---------- 그리기 ----------
   // 얼굴만 타일 가운데에 맞춰 그림 (머리 크기·주둥이 길이가 품종마다 달라서 폭·높이로 크기를 맞춤)
   // 타일 그림은 종류·선택 여부별로 한 번만 그려 두고 복사해서 씀 (폰에서 매 순간 48마리를 다시 그리면 느려짐)
@@ -363,7 +458,12 @@
     try {
       if (hint && now >= hint.until) { hint = null; dirty = true; }
       const hintOn = hint && now < hint.until;
-      const animating = hintOn || pops.length || moving.length || (pathFx && now < pathFx.until + 50);
+      const animating = hintOn || pops.length || moving.length || parts.length || floats.length || (pathFx && now < pathFx.until + 50);
+      // 연속 콤보 남은 시간 막대
+      const cf = document.getElementById('comboFill');
+      const left = running && combo >= 0 ? 1 - (now - lastMatch) / 2500 : 0;
+      cf.style.width = left > 0 ? `${left * 100}%` : '0';
+      if (left > 0) cf.style.background = tierColor(combo + 1, now);
       if (dirty || animating) { draw(now, hintOn); dirty = false; }
     } catch (e) { const el = document.getElementById('err'); el.style.display = 'block'; el.textContent = '오류: ' + e.message; }
     requestAnimationFrame(frame);
@@ -390,11 +490,15 @@
     pops = pops.filter((p) => now - p.at < 260);
     for (const p of pops) { const k = (now - p.at) / 260; drawTile(p.r, p.c, p.kind, t, { scale: 1 + k * 0.25, alpha: 1 - k }); }
     if (pathFx && now < pathFx.until) {
-      g.strokeStyle = '#E8402F'; g.lineWidth = 5; g.lineJoin = 'round'; g.lineCap = 'round';
+      const cb = pathFx.combo || 0;
+      g.save();
+      g.strokeStyle = tierColor(cb, now); g.lineWidth = 5 + Math.min(cb, 6); g.lineJoin = 'round'; g.lineCap = 'round';
+      if (cb >= 3) { g.shadowColor = g.strokeStyle; g.shadowBlur = 8 + Math.min(cb, 8) * 2; }
       g.globalAlpha = Math.min(1, (pathFx.until - now) / 150);
       g.beginPath(); pathFx.path.forEach(([r, c], i) => (i ? g.lineTo(px(c), py(r)) : g.moveTo(px(c), py(r)))); g.stroke();
-      g.globalAlpha = 1;
+      g.restore();
     }
+    drawEffects(now);
   }
   setInterval(tickTime, 250);
 
