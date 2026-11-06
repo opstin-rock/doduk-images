@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>멍냥 잇기 시험판</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700&display=swap">
+<style>
+  :root { --ink:#1f1f22; --cream:#fbf6ec; --yellow:#ffd54a; --red:#e8402f; --line:#2a2420; --muted:#6b6560; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; background:var(--cream); color:var(--ink); font-family:"Noto Sans KR",sans-serif; -webkit-text-size-adjust:100%; overscroll-behavior:none; }
+  .wrap { max-width:480px; margin:0 auto; padding:10px 8px 24px; }
+  header { display:flex; align-items:center; justify-content:space-between; padding:2px 6px 8px; }
+  h1 { font-family:"Jua",sans-serif; font-weight:400; font-size:24px; margin:0; }
+  .tag { font-size:11px; background:var(--line); color:#fff; border-radius:999px; padding:3px 8px; margin-left:6px; vertical-align:middle; }
+  .hud { display:flex; gap:6px; padding:0 4px 8px; }
+  .stat { flex:1; background:#fff; border:2px solid var(--line); border-radius:12px; padding:5px 0; text-align:center; }
+  .stat b { display:block; font-family:"Jua",sans-serif; font-size:20px; font-weight:400; }
+  .stat span { font-size:11px; color:var(--muted); }
+  canvas { display:block; margin:0 auto; touch-action:manipulation; }
+  .tools { display:flex; gap:8px; padding:10px 4px 0; }
+  button { font-family:"Jua",sans-serif; font-size:17px; border:2px solid var(--line); border-radius:12px; background:#fff; color:var(--ink); padding:10px 0; flex:1; cursor:pointer; }
+  button:disabled { opacity:.4; }
+  button.main { background:var(--line); color:#fff; }
+  .toast { position:fixed; left:50%; top:40%; transform:translate(-50%,-50%); background:rgba(31,31,34,.86); color:#fff; font-family:"Jua",sans-serif; font-size:22px; padding:10px 20px; border-radius:14px; pointer-events:none; opacity:0; transition:opacity .2s; }
+  .toast.on { opacity:1; }
+  .modal { position:fixed; inset:0; background:rgba(20,18,16,.55); display:none; align-items:center; justify-content:center; padding:16px; }
+  .modal.open { display:flex; }
+  .box { background:var(--cream); border:3px solid var(--line); border-radius:18px; padding:22px 18px 18px; width:100%; max-width:360px; text-align:center; }
+  .box h2 { font-family:"Jua",sans-serif; font-weight:400; font-size:28px; margin:0 0 10px; }
+  .box p { font-size:14px; line-height:1.65; margin:0 0 8px; }
+  .box .big { font-family:"Jua",sans-serif; font-size:44px; margin:6px 0 2px; }
+  .box .muted { color:var(--muted); font-size:12px; }
+  .box button { margin-top:12px; width:100%; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>멍냥 잇기<span class="tag">시험판</span></h1></header>
+  <div class="hud">
+    <div class="stat"><b id="time">0:00</b><span>시간</span></div>
+    <div class="stat"><b id="score">0</b><span>점수</span></div>
+    <div class="stat"><b id="left">24</b><span>남은 짝</span></div>
+  </div>
+  <canvas id="board"></canvas>
+  <div class="tools">
+    <button id="hintBtn">힌트 3</button>
+    <button id="shuffleBtn">섞기 1</button>
+    <button id="restartBtn">처음부터</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<div class="modal open" id="startBox"><div class="box">
+  <h2>멍냥 잇기</h2>
+  <p>같은 강아지·고양이 두 마리를 눌러서 없애 줘</p>
+  <p>둘 사이를 <b>꺾이는 곳 두 번 이하</b>인 선으로 이을 수 있어야 해. 판 바깥으로 돌아가도 돼</p>
+  <p class="muted">시험판이라 점수는 아직 저장되지 않아</p>
+  <button class="main" id="startBtn">시작</button>
+</div></div>
+
+<div class="modal" id="endBox"><div class="box">
+  <h2>다 이었다</h2>
+  <div class="big" id="endScore">0점</div>
+  <p id="endDetail"></p>
+  <p class="muted" id="endBest"></p>
+  <p class="muted">광장이 열리면 이 점수가 모두의 점수에 더해질 예정이야</p>
+  <button class="main" id="againBtn">한 판 더</button>
+</div></div>
+
+<script src="../pets.js?v=26"></script>
+<script>
+(() => {
+  // ---------- 설정 ----------
+  const COLS = 6, ROWS = 8;                        // 48칸 = 12종 x 4장
+  const KINDS = ['시바', '비숑', '퍼그', '시베리안허스키', '달마시안', '비글',
+                 '치즈 코숏', '턱시도', '삼색이', '러시안블루', '샴', '스핑크스'];
+  const TILE_BG = ['#FFE3C2', '#E6F4FF', '#FFF2B3', '#DDE7F7', '#F0F0F0', '#FFE0D6',
+                   '#FFEBC7', '#E8E3F5', '#FDE4EC', '#DDF2E3', '#F6EBDD', '#FCE1DA'];
+  const breedIdx = KINDS.map((n) => BREEDS.findIndex((b) => b.name === n));
+
+  // ---------- 화면 크기 ----------
+  const cv = document.getElementById('board'), g = cv.getContext('2d');
+  let ts, th, m, W, H, dpr;   // 타일 폭·높이, 바깥 여백
+  function layout() {
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const avail = Math.min(window.innerWidth, 480) - 16;
+    ts = Math.floor(avail / (COLS + 0.9)); th = Math.round(ts * 1.12); m = Math.round(ts * 0.45);
+    W = COLS * ts + m * 2; H = ROWS * th + m * 2;
+    cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  }
+  // 바깥 한 줄을 포함한 칸 번호(0~COLS+1, 0~ROWS+1) → 화면 중심 좌표
+  const px = (c) => (c === 0 ? m / 2 : c === COLS + 1 ? m + COLS * ts + m / 2 : m + (c - 1) * ts + ts / 2);
+  const py = (r) => (r === 0 ? m / 2 : r === ROWS + 1 ? m + ROWS * th + m / 2 : m + (r - 1) * th + th / 2);
+
+  // ---------- 판 ----------
+  let grid, sel, hint, pathFx, pops, startAt, endAt, score, combo, lastMatch, hintsLeft, shufflesLeft, running;
+  const empty = (r, c) => r < 0 || c < 0 || r > ROWS + 1 || c > COLS + 1 ? false : grid[r][c] === null;
+  function newGrid() {
+    const kinds = [];
+    KINDS.forEach((_, k) => { for (let i = 0; i < (COLS * ROWS) / KINDS.length; i++) kinds.push(k); });
+    shuffleArr(kinds);
+    grid = [];
+    for (let r = 0; r < ROWS + 2; r++) { grid.push([]); for (let c = 0; c < COLS + 2; c++) grid[r].push(r === 0 || c === 0 || r === ROWS + 1 || c === COLS + 1 ? null : kinds.pop()); }
+    if (!findMove()) reshuffle();
+  }
+  function shuffleArr(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+  function reshuffle() {
+    for (let tries = 0; tries < 50; tries++) {
+      const cells = [], kinds = [];
+      for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) if (grid[r][c] !== null) { cells.push([r, c]); kinds.push(grid[r][c]); }
+      shuffleArr(kinds);
+      cells.forEach(([r, c], i) => { grid[r][c] = kinds[i]; });
+      if (!cells.length || findMove()) return;
+    }
+  }
+
+  // ---------- 잇기 규칙: 꺾임 2번 이하 ----------
+  function straight(a, b) {   // 같은 줄이고 사이가 비어 있으면 true (양 끝 제외)
+    if (a[0] === b[0]) { const r = a[0], [c1, c2] = a[1] < b[1] ? [a[1], b[1]] : [b[1], a[1]]; for (let c = c1 + 1; c < c2; c++) if (!empty(r, c)) return false; return true; }
+    if (a[1] === b[1]) { const c = a[1], [r1, r2] = a[0] < b[0] ? [a[0], b[0]] : [b[0], a[0]]; for (let r = r1 + 1; r < r2; r++) if (!empty(r, c)) return false; return true; }
+    return false;
+  }
+  function oneCorner(a, b) {
+    for (const k of [[a[0], b[1]], [b[0], a[1]]]) if (empty(k[0], k[1]) && straight(a, k) && straight(k, b)) return [a, k, b];
+    return null;
+  }
+  function findPath(a, b) {
+    if (straight(a, b)) return [a, b];
+    const one = oneCorner(a, b); if (one) return one;
+    let best = null;
+    for (const [dr, dc] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+      for (let r = a[0] + dr, c = a[1] + dc; empty(r, c); r += dr, c += dc) {
+        const rest = oneCorner([r, c], b);
+        if (rest) { const p = [a, ...rest]; const len = p.reduce((s, q, i) => i ? s + Math.abs(q[0] - p[i - 1][0]) + Math.abs(q[1] - p[i - 1][1]) : 0, 0); if (!best || len < best.len) best = { p, len }; }
+      }
+    }
+    return best ? best.p : null;
+  }
+  function findMove() {
+    const byKind = {};
+    for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) if (grid[r][c] !== null) (byKind[grid[r][c]] ??= []).push([r, c]);
+    for (const list of Object.values(byKind)) for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) if (findPath(list[i], list[j])) return [list[i], list[j]];
+    return null;
+  }
+  const remaining = () => { let n = 0; for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) if (grid[r][c] !== null) n++; return n; };
+
+  // ---------- 누르기 ----------
+  cv.addEventListener('pointerdown', (e) => {
+    if (!running) return;
+    const rect = cv.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    const c = Math.floor((x - m) / ts) + 1, r = Math.floor((y - m) / th) + 1;
+    if (r < 1 || r > ROWS || c < 1 || c > COLS || grid[r][c] === null) return;
+    const here = [r, c];
+    if (!sel) { sel = here; return; }
+    if (sel[0] === r && sel[1] === c) { sel = null; return; }
+    if (grid[sel[0]][sel[1]] !== grid[r][c]) { sel = here; return; }
+    const path = findPath(sel, here);
+    if (!path) { toast('못 이어'); sel = here; return; }
+    match(sel, here, path);
+  });
+  function match(a, b, path) {
+    const now = performance.now();
+    const kind = grid[a[0]][a[1]];
+    combo = now - lastMatch < 2500 ? combo + 1 : 0; lastMatch = now;
+    score += 10 + Math.min(combo, 5) * 5;   // 콤보 보너스는 최대 +25
+    if (combo > 0) toast(`콤보 ${combo}`);
+    pathFx = { path, until: now + 320 };
+    pops.push({ r: a[0], c: a[1], kind, at: now }, { r: b[0], c: b[1], kind, at: now });
+    grid[a[0]][a[1]] = null; grid[b[0]][b[1]] = null;
+    sel = null; hint = null;
+    if (!remaining()) return finish();
+    if (!findMove()) { reshuffle(); toast('막혀서 섞었어'); }
+    updateHud();
+  }
+  function finish() {
+    running = false; endAt = performance.now();
+    const sec = Math.round((endAt - startAt) / 1000);
+    const bonus = Math.max(0, 240 - sec) * 2;
+    score += bonus; updateHud();
+    let best = 0; try { best = +localStorage.getItem('doduk-link-best') || 0; if (score > best) localStorage.setItem('doduk-link-best', score); } catch {}
+    setTimeout(() => {
+      document.getElementById('endScore').textContent = `${score}점`;
+      document.getElementById('endDetail').textContent = `${fmt(sec)} 걸림 · 시간 보너스 ${bonus}점`;
+      document.getElementById('endBest').textContent = score > best ? '내 최고 기록' : `내 최고 기록 ${best}점`;
+      document.getElementById('endBox').classList.add('open');
+    }, 500);
+  }
+
+  // ---------- 버튼 ----------
+  document.getElementById('hintBtn').onclick = () => {
+    if (!running || hintsLeft <= 0) return;
+    const mv = findMove(); if (!mv) return;
+    hint = { cells: mv, until: performance.now() + 2500 }; hintsLeft--; updateHud();
+  };
+  document.getElementById('shuffleBtn').onclick = () => {
+    if (!running || shufflesLeft <= 0) return;
+    reshuffle(); shufflesLeft--; sel = null; hint = null; toast('섞었어'); updateHud();
+  };
+  document.getElementById('restartBtn').onclick = () => start();
+  document.getElementById('startBtn').onclick = () => { document.getElementById('startBox').classList.remove('open'); start(); };
+  document.getElementById('againBtn').onclick = () => { document.getElementById('endBox').classList.remove('open'); start(); };
+
+  function start() {
+    newGrid(); sel = null; hint = null; pathFx = null; pops = [];
+    score = 0; combo = 0; lastMatch = -1e9; hintsLeft = 3; shufflesLeft = 1;
+    startAt = performance.now(); endAt = 0; running = true; updateHud();
+  }
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  function updateHud() {
+    document.getElementById('score').textContent = score;
+    document.getElementById('left').textContent = remaining() / 2;
+    document.getElementById('hintBtn').textContent = `힌트 ${hintsLeft}`;
+    document.getElementById('hintBtn').disabled = hintsLeft <= 0;
+    document.getElementById('shuffleBtn').textContent = `섞기 ${shufflesLeft}`;
+    document.getElementById('shuffleBtn').disabled = shufflesLeft <= 0;
+  }
+  let toastTimer;
+  function toast(t) { const el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 700); }
+
+  // ---------- 그리기 ----------
+  // 얼굴만 타일 가운데에 맞춰 그림 (머리 크기·주둥이 길이가 품종마다 달라서 폭·높이로 크기를 맞춤)
+  function drawFace(kind, cx, cy, w, h, t) {
+    const b = BREEDS[breedIdx[kind]];
+    const headR = b.headR ?? 16, snout = b.snout ?? (b.kind === 'dog' ? 7 : 0);
+    const faceW = headR * 1.9 + snout + 6, faceH = headR * 2 + 16;
+    const k = Math.min(w / faceW, h / faceH);
+    g.save(); g.translate(cx, cy); g.scale(k, k);
+    g.lineWidth = 2.4; g.strokeStyle = '#2a2420'; g.lineJoin = 'round'; g.lineCap = 'round';
+    drawHead(g, b, -(snout - headR * 0.17) / 2, 7, headR, b.head ?? b.base, snout, t, breedIdx[kind]);
+    g.restore();
+  }
+  function drawTile(r, c, kind, t, opts = {}) {
+    const x = m + (c - 1) * ts, y = m + (r - 1) * th;
+    const lift = opts.sel ? 4 : 0;
+    g.save();
+    if (opts.scale) { g.translate(x + ts / 2, y + th / 2); g.scale(opts.scale, opts.scale); g.translate(-(x + ts / 2), -(y + th / 2)); g.globalAlpha = opts.alpha ?? 1; }
+    g.fillStyle = 'rgba(42,36,32,.18)'; g.beginPath(); g.roundRect(x + 2, y + 4, ts - 4, th - 4, 9); g.fill();
+    g.fillStyle = opts.sel ? '#FFD54A' : TILE_BG[kind]; g.strokeStyle = '#2a2420'; g.lineWidth = 2;
+    g.beginPath(); g.roundRect(x + 2, y + 2 - lift, ts - 4, th - 6, 9); g.fill(); g.stroke();
+    if (opts.hint) { g.strokeStyle = `rgba(232,64,47,${0.55 + 0.45 * Math.sin(t * 10)})`; g.lineWidth = 4; g.beginPath(); g.roundRect(x + 1, y + 1, ts - 2, th - 4, 10); g.stroke(); }
+    g.save(); g.beginPath(); g.roundRect(x + 3, y + 3 - lift, ts - 6, th - 8, 8); g.clip();
+    drawFace(kind, x + ts / 2, y + th / 2 - lift - 1, ts - 10, th - 12, t);
+    g.restore();
+    g.restore();
+  }
+  function frame(now) {
+    const t = now / 1000;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.fillStyle = '#EFE4D2'; g.beginPath(); g.roundRect(0, 0, W, H, 16); g.fill();
+    g.fillStyle = '#F7EFE2'; g.beginPath(); g.roundRect(m - 4, m - 4, COLS * ts + 8, ROWS * th + 8, 12); g.fill();
+    if (grid) {
+      const hintOn = hint && now < hint.until;
+      for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) {
+        if (grid[r][c] === null) continue;
+        const isSel = sel && sel[0] === r && sel[1] === c;
+        const isHint = hintOn && hint.cells.some(([hr, hc]) => hr === r && hc === c);
+        drawTile(r, c, grid[r][c], t, { sel: isSel, hint: isHint });
+      }
+      pops = pops.filter((p) => now - p.at < 260);
+      for (const p of pops) { const k = (now - p.at) / 260; drawTile(p.r, p.c, p.kind, t, { scale: 1 + k * 0.25, alpha: 1 - k }); }
+      if (pathFx && now < pathFx.until) {
+        g.strokeStyle = '#E8402F'; g.lineWidth = 5; g.lineJoin = 'round'; g.lineCap = 'round';
+        g.globalAlpha = Math.min(1, (pathFx.until - now) / 150);
+        g.beginPath(); pathFx.path.forEach(([r, c], i) => (i ? g.lineTo(px(c), py(r)) : g.moveTo(px(c), py(r)))); g.stroke();
+        g.globalAlpha = 1;
+      }
+      if (running) document.getElementById('time').textContent = fmt(Math.floor((now - startAt) / 1000));
+    }
+    requestAnimationFrame(frame);
+  }
+
+  layout(); newGrid(); updateHud(); running = false;
+  addEventListener('resize', layout);
+  requestAnimationFrame(frame);
+  window.__link = { findPath, findMove, get grid() { return grid; }, match, remaining, frame };   // 시험용
+})();
+</script>
+</body>
+</html>
