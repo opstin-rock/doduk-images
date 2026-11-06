@@ -10,9 +10,9 @@
   :root { --ink:#1f1f22; --cream:#fbf6ec; --yellow:#ffd54a; --red:#e8402f; --line:#2a2420; --muted:#6b6560; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body { margin:0; background:var(--cream); color:var(--ink); font-family:"Noto Sans KR",sans-serif; -webkit-text-size-adjust:100%; overscroll-behavior:none; }
-  .wrap { max-width:480px; margin:0 auto; padding:10px 8px 24px; }
-  header { padding:2px 6px 8px; }
-  h1 { font-family:"Jua",sans-serif; font-weight:400; font-size:24px; margin:0; }
+  .wrap { max-width:480px; margin:0 auto; padding:6px 8px 8px; }
+  header { padding:0 6px 4px; }
+  h1 { font-family:"Jua",sans-serif; font-weight:400; font-size:20px; margin:0; }
   .tag { font-size:11px; background:var(--line); color:#fff; border-radius:999px; padding:3px 8px; margin-left:6px; vertical-align:middle; }
   .hud { display:flex; gap:6px; padding:0 4px 6px; }
   .stat { flex:1; background:#fff; border:2px solid var(--line); border-radius:12px; padding:5px 0; text-align:center; }
@@ -170,7 +170,13 @@
   function layout() {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     W = Math.min(window.innerWidth, 480) - 16;
-    cw = Math.floor(W / 7.2); ch = Math.round(cw * 1.42);   // 맨 아래 10장이 옆 카드와 조금 겹칠 만큼 크게 (숫자는 왼쪽 위라 안 가림)
+    cw = Math.floor(W / 7.2);   // 맨 아래 10장이 옆 카드와 조금 겹칠 만큼 크게 (숫자는 왼쪽 위라 안 가림)
+    // 화면 높이에도 맞춤 (카카오톡 등 앱 안 브라우저는 아래 도구 막대 때문에 짧음): 판 높이 ≈ 70 + 카드 높이 x 3.69
+    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const others = document.querySelector('.wrap').offsetHeight - cv.offsetHeight;
+    const maxCh = (vh - others - 6 - 70) / 3.69;
+    cw = Math.max(26, Math.min(cw, Math.floor(maxCh / 1.42)));
+    ch = Math.round(cw * 1.42);
     sx = (W - 12 - cw) / 9; sy = Math.round(ch * 0.48);
     top0 = 10; baseY = top0 + sy * 3 + ch + 34;
     stockX = W / 2 - cw * 1.9; wasteX = W / 2 + cw * 0.3;
@@ -499,8 +505,16 @@
   }
 
   layout(); deal(); score = 0; round = 1; bestStreak = 0; running = false; updateHud();
-  let lastW = window.innerWidth;
-  addEventListener('resize', () => { if (window.innerWidth !== lastW) { lastW = window.innerWidth; layout(); dirty = true; } });
+  // 폭이 바뀌거나 높이가 크게 바뀔 때만 다시 맞춤
+  let lastW = window.innerWidth, lastH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  function refit() {
+    const w = window.innerWidth, h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    if (w === lastW && Math.abs(h - lastH) < 60) return;
+    lastW = w; lastH = h; layout(); dirty = true;
+  }
+  addEventListener('resize', refit);
+  if (window.visualViewport) visualViewport.addEventListener('resize', refit);
+  setTimeout(() => { layout(); dirty = true; }, 300);
   requestAnimationFrame(frame);
   window.__peaks = { get tab() { return tab; }, get stock() { return stock; }, get waste() { return waste; }, playable, play, flip, open, get score() { return score; }, get running() { return running; }, frame, slotPos, SLOTS };   // 시험용
 })();
