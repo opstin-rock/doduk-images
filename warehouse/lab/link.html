@@ -47,6 +47,18 @@
   .box .big { font-family:"Jua",sans-serif; font-size:44px; margin:6px 0 2px; }
   .box .muted { color:var(--muted); font-size:12px; }
   .box button { margin-top:12px; width:100%; }
+  /* 한글이 낱말 중간에서 줄바꿈되지 않게 */
+  .box, .toast, .combo { word-break:keep-all; overflow-wrap:break-word; }
+  .toast { width:max-content; max-width:88vw; text-align:center; line-height:1.35; }
+  .rules { text-align:left; max-height:calc(100vh - 32px); overflow-y:auto; padding:18px 16px 16px; }
+  .rules h2 { text-align:center; font-size:24px; }
+  .rules ol { margin:0 0 6px; padding-left:20px; font-size:14px; line-height:1.6; }
+  .rules li { margin-bottom:5px; }
+  .sum { background:#fff; border:2px solid var(--line); border-radius:12px; padding:8px 12px; margin:4px 0 6px; text-align:left; }
+  .sum div { display:flex; justify-content:space-between; gap:10px; font-size:14px; line-height:1.9; }
+  .sum div b { font-family:"Jua",sans-serif; font-weight:400; font-size:16px; white-space:nowrap; }
+  .sum .total { border-top:1px dashed #c9bfae; margin-top:2px; padding-top:2px; }
+  .next { font-size:14px; line-height:1.6; margin:8px 0 0; }
 </style>
 </head>
 <body>
@@ -70,19 +82,24 @@
 <div class="toast" id="toast"></div>
 <div class="combo" id="combo"></div>
 
-<div class="modal open" id="startBox"><div class="box">
-  <h2>사천성</h2>
-  <p>같은 강아지·고양이 두 마리를 눌러서 없애 줘</p>
-  <p>둘 사이를 <b>꺾이는 곳 두 번 이하</b>인 선으로 이을 수 있어야 해. 판 바깥으로 돌아가도 돼</p>
-  <p>시간 안에 판을 다 비우면 다음 단계. 2단계부터는 짝을 없앨 때마다 남은 아이들이 한쪽으로 쏠리고, 못 없애는 택배 상자가 길을 막아</p>
-  <p class="muted">시험판이라 점수는 아직 저장되지 않아</p>
+<div class="modal open" id="startBox"><div class="box rules">
+  <h2>사천성 하는 법</h2>
+  <ol>
+    <li><b>같은 아이 두 마리</b>를 차례로 눌러서 없애</li>
+    <li>둘 사이를 <b>꺾이는 곳 두 번 이하</b>인 선으로 이을 수 있어야 해. 판 바깥으로 돌아가도 돼</li>
+    <li><b>시간 안에</b> 판을 다 비우면 다음 단계. 짝 하나 없앨 때마다 1초씩 늘어나</li>
+    <li>2단계부터는 짝을 없앨 때마다 남은 아이들이 <b>한쪽으로 쏠려</b></li>
+    <li><b>택배 상자</b>는 못 없애고 길을 막아. 돌아서 이어</li>
+    <li>2.5초 안에 다음 짝을 찾으면 <b>연속 보너스</b></li>
+  </ol>
+  <p class="muted">막히면 힌트·섞기를 써. 시험판이라 점수는 아직 저장되지 않아</p>
   <button class="main" id="startBtn">시작</button>
 </div></div>
 
 <div class="modal" id="clearBox"><div class="box">
   <h2 id="clearTitle">1단계 성공</h2>
-  <p id="clearDetail"></p>
-  <p id="clearNext"></p>
+  <div class="sum" id="clearDetail"></div>
+  <p class="next" id="clearNext"></p>
   <button class="main" id="nextBtn">다음 단계</button>
 </div></div>
 
@@ -287,8 +304,11 @@
     const next = stageInfo(stage + 1);
     setTimeout(() => {
       document.getElementById('clearTitle').textContent = `${stage}단계 성공`;
-      document.getElementById('clearDetail').textContent = `남은 시간 ${left}초 · 보너스 ${bonus}점 · 지금 ${score}점`;
-      document.getElementById('clearNext').textContent = `다음은 ${stage + 1}단계: ${stageLabel(next)}, ${next.time}초 (힌트·섞기 하나씩 더 줌)`;
+      document.getElementById('clearDetail').innerHTML =
+        `<div><span>남은 시간 ${left}초 × 5</span><b>+${bonus}</b></div>` +
+        `<div class="total"><span>지금까지 점수</span><b>${score}점</b></div>`;
+      document.getElementById('clearNext').innerHTML =
+        `다음은 <b>${stage + 1}단계</b><br>${stageLabel(next)} · ${next.time}초<br>힌트·섞기 하나씩 더 줄게`;
       document.getElementById('clearBox').classList.add('open');
     }, 500);
   }
@@ -296,7 +316,7 @@
     running = false; sel = null; hint = null; updateHud();
     const best = bestScore();
     document.getElementById('endScore').textContent = `${score}점`;
-    document.getElementById('endDetail').textContent = `${stage}단계까지 왔어`;
+    document.getElementById('endDetail').textContent = `${stage}단계까지 왔어`;   // 짧아서 한 줄
     document.getElementById('endBest').textContent = score > best ? '내 최고 기록' : `내 최고 기록 ${best}점`;
     document.getElementById('endBox').classList.add('open');
   }
