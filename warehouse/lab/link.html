@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>멍냥 잇기 시험판</title>
+<title>사천성 시험판</title>
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700&display=swap">
 <style>
@@ -37,7 +37,7 @@
 </head>
 <body>
 <div class="wrap">
-  <header><h1>멍냥 잇기<span class="tag">시험판</span></h1></header>
+  <header><h1>사천성<span class="tag">시험판</span></h1></header>
   <div class="hud">
     <div class="stat"><b id="time">0:00</b><span>시간</span></div>
     <div class="stat"><b id="score">0</b><span>점수</span></div>
@@ -53,7 +53,7 @@
 <div class="toast" id="toast"></div>
 
 <div class="modal open" id="startBox"><div class="box">
-  <h2>멍냥 잇기</h2>
+  <h2>사천성</h2>
   <p>같은 강아지·고양이 두 마리를 눌러서 없애 줘</p>
   <p>둘 사이를 <b>꺾이는 곳 두 번 이하</b>인 선으로 이을 수 있어야 해. 판 바깥으로 돌아가도 돼</p>
   <p class="muted">시험판이라 점수는 아직 저장되지 않아</p>
@@ -69,6 +69,22 @@
   <button class="main" id="againBtn">한 판 더</button>
 </div></div>
 
+<div id="err" style="display:none;position:fixed;left:0;right:0;bottom:0;background:#e8402f;color:#fff;font-size:12px;padding:6px 10px;z-index:9"></div>
+<script>
+  // 카카오톡·인스타 같은 앱 안 브라우저(옛 안드로이드 웹뷰, iOS 15 이하)에는 둥근 사각형 그리기가 없음 → 직접 채워 넣음
+  if (location.search.includes('oldtest')) { delete CanvasRenderingContext2D.prototype.roundRect; window.PointerEvent = undefined; }   // 옛 브라우저 흉내 (시험용)
+  if (window.CanvasRenderingContext2D && !CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+      r = Math.max(0, Math.min(typeof r === 'number' ? r : (r && r[0]) || 0, Math.abs(w) / 2, Math.abs(h) / 2));
+      this.moveTo(x + r, y); this.lineTo(x + w - r, y); this.arcTo(x + w, y, x + w, y + r, r);
+      this.lineTo(x + w, y + h - r); this.arcTo(x + w, y + h, x + w - r, y + h, r);
+      this.lineTo(x + r, y + h); this.arcTo(x, y + h, x, y + h - r, r);
+      this.lineTo(x, y + r); this.arcTo(x, y, x + r, y, r); this.closePath();
+    };
+  }
+  // 오류가 나면 화면 아래에 한 줄로 보여줌 (폰에서 원인 알려 주기용)
+  window.addEventListener('error', (e) => { const el = document.getElementById('err'); el.style.display = 'block'; el.textContent = '오류: ' + (e.message || e.type); });
+</script>
 <script src="../pets.js?v=26"></script>
 <script>
 (() => {
@@ -84,7 +100,7 @@
   const cv = document.getElementById('board'), g = cv.getContext('2d');
   let ts, th, m, W, H, dpr;   // 타일 폭·높이, 바깥 여백
   function layout() {
-    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
     const avail = Math.min(window.innerWidth, 480) - 16;
     ts = Math.floor(avail / (COLS + 0.9)); th = Math.round(ts * 1.12); m = Math.round(ts * 0.45);
     W = COLS * ts + m * 2; H = ROWS * th + m * 2;
@@ -140,17 +156,28 @@
   }
   function findMove() {
     const byKind = {};
-    for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) if (grid[r][c] !== null) (byKind[grid[r][c]] ??= []).push([r, c]);
+    for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) if (grid[r][c] !== null) { const k = grid[r][c]; if (!byKind[k]) byKind[k] = []; byKind[k].push([r, c]); }
     for (const list of Object.values(byKind)) for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) if (findPath(list[i], list[j])) return [list[i], list[j]];
     return null;
   }
   const remaining = () => { let n = 0; for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) if (grid[r][c] !== null) n++; return n; };
 
   // ---------- 누르기 ----------
-  cv.addEventListener('pointerdown', (e) => {
+  // 앱 안 브라우저마다 터치 신호가 달라서 pointer / touch / mouse 중 먼저 온 것 하나만 처리
+  let lastTap = { at: 0, x: -99, y: -99 };
+  function onTap(clientX, clientY) {
+    const now = Date.now();
+    if (now - lastTap.at < 450 && Math.abs(clientX - lastTap.x) < 12 && Math.abs(clientY - lastTap.y) < 12) return;   // 같은 손가락의 중복 신호
+    lastTap = { at: now, x: clientX, y: clientY };
+    tapAt(clientX, clientY); dirty = true;
+  }
+  if (window.PointerEvent) cv.addEventListener('pointerdown', (e) => { e.preventDefault(); onTap(e.clientX, e.clientY); });
+  cv.addEventListener('touchstart', (e) => { e.preventDefault(); const t = e.changedTouches[0]; onTap(t.clientX, t.clientY); }, { passive: false });
+  cv.addEventListener('mousedown', (e) => onTap(e.clientX, e.clientY));
+  function tapAt(clientX, clientY) {
     if (!running) return;
     const rect = cv.getBoundingClientRect();
-    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    const x = clientX - rect.left, y = clientY - rect.top;
     const c = Math.floor((x - m) / ts) + 1, r = Math.floor((y - m) / th) + 1;
     if (r < 1 || r > ROWS || c < 1 || c > COLS || grid[r][c] === null) return;
     const here = [r, c];
@@ -160,7 +187,7 @@
     const path = findPath(sel, here);
     if (!path) { toast('못 이어'); sel = here; return; }
     match(sel, here, path);
-  });
+  }
   function match(a, b, path) {
     const now = performance.now();
     const kind = grid[a[0]][a[1]];
@@ -210,6 +237,7 @@
   }
   const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   function updateHud() {
+    dirty = true;
     document.getElementById('score').textContent = score;
     document.getElementById('left').textContent = remaining() / 2;
     document.getElementById('hintBtn').textContent = `힌트 ${hintsLeft}`;
@@ -222,58 +250,75 @@
 
   // ---------- 그리기 ----------
   // 얼굴만 타일 가운데에 맞춰 그림 (머리 크기·주둥이 길이가 품종마다 달라서 폭·높이로 크기를 맞춤)
-  function drawFace(kind, cx, cy, w, h, t) {
+  // 타일 그림은 종류·선택 여부별로 한 번만 그려 두고 복사해서 씀 (폰에서 매 순간 48마리를 다시 그리면 느려짐)
+  let tileCache = {};
+  function tileImage(kind, isSel) {
+    const key = kind + (isSel ? 's' : '');
+    if (tileCache[key]) return tileCache[key];
+    const tc = document.createElement('canvas'); tc.width = Math.ceil(ts * dpr); tc.height = Math.ceil(th * dpr);
+    const q = tc.getContext('2d'); q.scale(dpr, dpr);
+    const lift = isSel ? 4 : 0;
+    q.fillStyle = 'rgba(42,36,32,.18)'; q.beginPath(); q.roundRect(2, 4, ts - 4, th - 4, 9); q.fill();
+    q.fillStyle = isSel ? '#FFD54A' : TILE_BG[kind]; q.strokeStyle = '#2a2420'; q.lineWidth = 2;
+    q.beginPath(); q.roundRect(2, 2 - lift, ts - 4, th - 6, 9); q.fill(); q.stroke();
+    q.save(); q.beginPath(); q.roundRect(3, 3 - lift, ts - 6, th - 8, 8); q.clip();
+    // 얼굴만 가운데에 (머리 크기·주둥이 길이가 품종마다 달라서 폭·높이로 크기를 맞춤)
     const b = BREEDS[breedIdx[kind]];
     const headR = b.headR ?? 16, snout = b.snout ?? (b.kind === 'dog' ? 7 : 0);
-    const faceW = headR * 1.9 + snout + 6, faceH = headR * 2 + 16;
-    const k = Math.min(w / faceW, h / faceH);
-    g.save(); g.translate(cx, cy); g.scale(k, k);
-    g.lineWidth = 2.4; g.strokeStyle = '#2a2420'; g.lineJoin = 'round'; g.lineCap = 'round';
-    drawHead(g, b, -(snout - headR * 0.17) / 2, 7, headR, b.head ?? b.base, snout, t, breedIdx[kind]);
-    g.restore();
+    const k = Math.min((ts - 10) / (headR * 1.9 + snout + 6), (th - 12) / (headR * 2 + 16));
+    q.translate(ts / 2, th / 2 - lift - 1); q.scale(k, k);
+    q.lineWidth = 2.4; q.strokeStyle = '#2a2420'; q.lineJoin = 'round'; q.lineCap = 'round';
+    drawHead(q, b, -(snout - headR * 0.17) / 2, 7, headR, b.head ?? b.base, snout, 0.3, breedIdx[kind]);
+    q.restore();
+    return (tileCache[key] = tc);
   }
   function drawTile(r, c, kind, t, opts = {}) {
     const x = m + (c - 1) * ts, y = m + (r - 1) * th;
-    const lift = opts.sel ? 4 : 0;
     g.save();
-    if (opts.scale) { g.translate(x + ts / 2, y + th / 2); g.scale(opts.scale, opts.scale); g.translate(-(x + ts / 2), -(y + th / 2)); g.globalAlpha = opts.alpha ?? 1; }
-    g.fillStyle = 'rgba(42,36,32,.18)'; g.beginPath(); g.roundRect(x + 2, y + 4, ts - 4, th - 4, 9); g.fill();
-    g.fillStyle = opts.sel ? '#FFD54A' : TILE_BG[kind]; g.strokeStyle = '#2a2420'; g.lineWidth = 2;
-    g.beginPath(); g.roundRect(x + 2, y + 2 - lift, ts - 4, th - 6, 9); g.fill(); g.stroke();
+    if (opts.scale) { g.translate(x + ts / 2, y + th / 2); g.scale(opts.scale, opts.scale); g.translate(-(x + ts / 2), -(y + th / 2)); g.globalAlpha = opts.alpha == null ? 1 : opts.alpha; }
+    g.drawImage(tileImage(kind, opts.sel), x, y, ts, th);
     if (opts.hint) { g.strokeStyle = `rgba(232,64,47,${0.55 + 0.45 * Math.sin(t * 10)})`; g.lineWidth = 4; g.beginPath(); g.roundRect(x + 1, y + 1, ts - 2, th - 4, 10); g.stroke(); }
-    g.save(); g.beginPath(); g.roundRect(x + 3, y + 3 - lift, ts - 6, th - 8, 8); g.clip();
-    drawFace(kind, x + ts / 2, y + th / 2 - lift - 1, ts - 10, th - 12, t);
-    g.restore();
     g.restore();
   }
+  let dirty = true;
   function frame(now) {
-    const t = now / 1000;
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.fillStyle = '#EFE4D2'; g.beginPath(); g.roundRect(0, 0, W, H, 16); g.fill();
-    g.fillStyle = '#F7EFE2'; g.beginPath(); g.roundRect(m - 4, m - 4, COLS * ts + 8, ROWS * th + 8, 12); g.fill();
-    if (grid) {
+    try {
+      if (hint && now >= hint.until) { hint = null; dirty = true; }
       const hintOn = hint && now < hint.until;
-      for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) {
-        if (grid[r][c] === null) continue;
-        const isSel = sel && sel[0] === r && sel[1] === c;
-        const isHint = hintOn && hint.cells.some(([hr, hc]) => hr === r && hc === c);
-        drawTile(r, c, grid[r][c], t, { sel: isSel, hint: isHint });
-      }
-      pops = pops.filter((p) => now - p.at < 260);
-      for (const p of pops) { const k = (now - p.at) / 260; drawTile(p.r, p.c, p.kind, t, { scale: 1 + k * 0.25, alpha: 1 - k }); }
-      if (pathFx && now < pathFx.until) {
-        g.strokeStyle = '#E8402F'; g.lineWidth = 5; g.lineJoin = 'round'; g.lineCap = 'round';
-        g.globalAlpha = Math.min(1, (pathFx.until - now) / 150);
-        g.beginPath(); pathFx.path.forEach(([r, c], i) => (i ? g.lineTo(px(c), py(r)) : g.moveTo(px(c), py(r)))); g.stroke();
-        g.globalAlpha = 1;
-      }
-      if (running) document.getElementById('time').textContent = fmt(Math.floor((now - startAt) / 1000));
-    }
+      const animating = hintOn || pops.length || (pathFx && now < pathFx.until + 50);
+      if (dirty || animating) { draw(now, hintOn); dirty = false; }
+    } catch (e) { const el = document.getElementById('err'); el.style.display = 'block'; el.textContent = '오류: ' + e.message; }
     requestAnimationFrame(frame);
   }
+  function draw(now, hintOn) {
+    const t = now / 1000;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = '#EFE4D2'; g.beginPath(); g.roundRect(0, 0, W, H, 16); g.fill();
+    g.fillStyle = '#F7EFE2'; g.beginPath(); g.roundRect(m - 4, m - 4, COLS * ts + 8, ROWS * th + 8, 12); g.fill();
+    if (!grid) return;
+    for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) {
+      if (grid[r][c] === null) continue;
+      const isSel = sel && sel[0] === r && sel[1] === c;
+      const isHint = hintOn && hint.cells.some(([hr, hc]) => hr === r && hc === c);
+      drawTile(r, c, grid[r][c], t, { sel: isSel, hint: isHint });
+    }
+    pops = pops.filter((p) => now - p.at < 260);
+    for (const p of pops) { const k = (now - p.at) / 260; drawTile(p.r, p.c, p.kind, t, { scale: 1 + k * 0.25, alpha: 1 - k }); }
+    if (pathFx && now < pathFx.until) {
+      g.strokeStyle = '#E8402F'; g.lineWidth = 5; g.lineJoin = 'round'; g.lineCap = 'round';
+      g.globalAlpha = Math.min(1, (pathFx.until - now) / 150);
+      g.beginPath(); pathFx.path.forEach(([r, c], i) => (i ? g.lineTo(px(c), py(r)) : g.moveTo(px(c), py(r)))); g.stroke();
+      g.globalAlpha = 1;
+    }
+  }
+  setInterval(() => { if (running) document.getElementById('time').textContent = fmt(Math.floor((performance.now() - startAt) / 1000)); }, 250);
 
+  pops = [];
   layout(); newGrid(); updateHud(); running = false;
-  addEventListener('resize', layout);
+  // 앱 안 브라우저는 스크롤할 때 주소창이 숨었다 나타나며 높이만 바뀜 → 폭이 바뀔 때만 다시 맞춤
+  let lastW = window.innerWidth;
+  addEventListener('resize', () => { if (window.innerWidth !== lastW) { lastW = window.innerWidth; layout(); tileCache = {}; dirty = true; } });
   requestAnimationFrame(frame);
   window.__link = { findPath, findMove, get grid() { return grid; }, match, remaining, frame };   // 시험용
 })();
