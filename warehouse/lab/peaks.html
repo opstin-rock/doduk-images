@@ -62,6 +62,7 @@
   .sum .total { border-top:1px dashed #c9bfae; margin-top:2px; padding-top:2px; }
   .rules { text-align:left; padding:18px 16px 0; }
   .rules h2 { text-align:center; font-size:24px; }
+  .back { display:inline-block; font-size:13px; color:var(--muted); text-decoration:none; margin-bottom:4px; }
   .rules ol { margin:0 0 6px; padding-left:20px; font-size:14px; line-height:1.6; }
   .rules li { margin-bottom:5px; }
   .hl { background:#FFE58A; border-radius:4px; padding:0 3px; }
@@ -98,6 +99,7 @@
 <div class="combo" id="combo"></div>
 
 <div class="modal open" id="startBox"><div class="box rules">
+  <a class="back" href="arcade.html?v=1">← 오락실</a>
   <h2>트라이피크 하는 법</h2>
   <ol>
     <li><b>목표</b>: 위에 쌓인 봉우리 카드 28장을 전부 가져오기</li>
@@ -114,7 +116,7 @@
     <li><b>가져올 게 없으면</b> 왼쪽 <span class="hl">더미</span>를 눌러 새 카드를 펼쳐. 더미가 다 떨어지고 가져올 것도 없으면 끝</li>
     <li><b>점수</b>: 연달아 가져올수록 커져 (더미를 넘기면 연속이 끊겨). 봉우리 꼭대기는 +50, 판을 다 깨면 보너스</li>
   </ol>
-  <p class="muted">처음 판에서는 누를 수 있는 카드가 노랗게 빛나. 시험판이라 점수는 아직 저장되지 않아</p>
+  <p class="muted">처음 판에서는 누를 수 있는 카드가 노랗게 빛나. 판을 깨거나 끝나면 얻은 점수가 모두의 점수에 보태져</p>
   <button class="main" id="startBtn">시작</button>
 </div></div>
 
@@ -129,7 +131,7 @@
   <div class="big" id="endScore">0점</div>
   <p id="endDetail"></p>
   <p class="muted" id="endBest"></p>
-  <p class="muted">광장이 열리면 이 점수가 모두의 점수에 더해질 예정이야</p>
+  <div class="sum" id="endEveryone"></div>
   <button class="main" id="againBtn">처음부터 다시</button>
 </div></div>
 
@@ -150,6 +152,8 @@
 </script>
 <script src="../pets.js?v=26"></script>
 <script src="haptic.js?v=1"></script>
+<script src="../config.js?v=26"></script>
+<script src="score.js?v=1"></script>
 <script>
 (() => {
   // ---------- 카드 ----------
@@ -307,31 +311,53 @@
     document.getElementById('endScore').textContent = `${score}점`;
     document.getElementById('endDetail').innerHTML = `${round}판까지 왔어<br>최고 ${bestStreak}연속`;
     document.getElementById('endBest').textContent = score > best ? '내 최고 기록' : `내 최고 기록 ${best}점`;
+    showEveryone(document.getElementById('endEveryone'), sendGained());
     setTimeout(() => document.getElementById('endBox').classList.add('open'), 500);
+  }
+  // 모두의 점수: 아직 안 보낸 만큼만 보냄 (판 성공, 끝, 처음부터, 창 닫기 때)
+  let sent = 0;
+  function sendGained(keepalive) {
+    const gain = score - sent;
+    if (gain > 0) { sent = score; Score.send('peaks', gain, { keepalive }); }
+    return Math.max(0, gain);
+  }
+  addEventListener('pagehide', () => sendGained(true));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) sendGained(true); });
+  function showEveryone(el, given) {
+    el.innerHTML = `<div><span>이번에 모두의 점수에 보탬</span><b>+${Score.fmt(given)}</b></div>` +
+      `<div><span>내가 지금까지 보탠 점수</span><b>${Score.fmt(Score.mine())}</b></div>` +
+      `<div class="total"><span>모두의 점수</span><b id="${el.id}Total">불러오는 중</b></div>`;
+    setTimeout(async () => {
+      const t = await Score.total();
+      const b = document.getElementById(`${el.id}Total`);
+      if (b) b.textContent = t ? `${Score.fmt(t.total)}점` : '아직 못 불러옴';
+    }, 600);
   }
   function clearRound() {
     running = false;
     const bonus = 200 + stock.length * 20;
     score += bonus; updateHud(); confetti(performance.now());
+    const given = sendGained();
     document.getElementById('clearTitle').textContent = `${round}판 다 깼다`;
     document.getElementById('clearDetail').innerHTML =
       `<div><span>다 깬 보너스</span><b>+200</b></div>` +
       `<div><span>남은 더미 ${stock.length}장 × 20</span><b>+${stock.length * 20}</b></div>` +
-      `<div class="total"><span>지금까지 점수</span><b>${score}점</b></div>`;
+      `<div class="total"><span>지금까지 점수</span><b>${score}점</b></div>` +
+      `<div><span>모두의 점수에 보탬</span><b>+${Score.fmt(given)}</b></div>`;
     setTimeout(() => document.getElementById('clearBox').classList.add('open'), 600);
   }
   function bestScore() { let best = 0; try { best = +localStorage.getItem('doduk-peaks-best') || 0; if (score > best) localStorage.setItem('doduk-peaks-best', score); } catch {} return best; }
 
   document.getElementById('startBtn').onclick = () => { document.getElementById('startBox').classList.remove('open'); if (!started) start(); };
   document.getElementById('rulesBtn').onclick = () => { document.getElementById('startBtn').textContent = started ? '계속하기' : '시작'; document.getElementById('startBox').classList.add('open'); };
-  document.getElementById('restartBtn').onclick = () => start();
+  document.getElementById('restartBtn').onclick = () => { sendGained(); start(); };
   const vibeBtn = document.getElementById('vibeBtn');
   const vibeLabel = () => { vibeBtn.textContent = Haptic.on ? '진동 켬' : '진동 끔'; vibeBtn.classList.toggle('off', !Haptic.on); };
   vibeBtn.onclick = () => { Haptic.toggle(); vibeLabel(); toast(Haptic.on ? '진동 켰어' : '진동 껐어'); };
   vibeLabel();
   document.getElementById('againBtn').onclick = () => { document.getElementById('endBox').classList.remove('open'); start(); };
   document.getElementById('nextBtn').onclick = () => { document.getElementById('clearBox').classList.remove('open'); round++; deal(); running = true; updateHud(); toast(`${round}판`); };
-  function start() { started = true; playsMade = 0; stockTipShown = false; score = 0; round = 1; bestStreak = 0; deal(); running = true; updateHud(); setTimeout(() => toast('노랗게 빛나는 카드를 눌러 봐'), 300); }
+  function start() { started = true; playsMade = 0; stockTipShown = false; score = 0; sent = 0; round = 1; bestStreak = 0; deal(); running = true; updateHud(); setTimeout(() => toast('노랗게 빛나는 카드를 눌러 봐'), 300); }
 
   function updateHud() {
     dirty = true;
