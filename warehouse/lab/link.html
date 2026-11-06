@@ -14,7 +14,10 @@
   header { display:flex; align-items:center; justify-content:space-between; padding:2px 6px 8px; }
   h1 { font-family:"Jua",sans-serif; font-weight:400; font-size:24px; margin:0; }
   .tag { font-size:11px; background:var(--line); color:#fff; border-radius:999px; padding:3px 8px; margin-left:6px; vertical-align:middle; }
-  .hud { display:flex; gap:6px; padding:0 4px 8px; }
+  .hud { display:flex; gap:6px; padding:0 4px 6px; }
+  .timebar { height:12px; margin:0 4px 8px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; }
+  .timebar i { display:block; height:100%; width:100%; background:#7BC67E; transition:width .25s linear, background .3s; }
+  .timebar i.low { background:var(--red); }
   .stat { flex:1; background:#fff; border:2px solid var(--line); border-radius:12px; padding:5px 0; text-align:center; }
   .stat b { display:block; font-family:"Jua",sans-serif; font-size:20px; font-weight:400; }
   .stat span { font-size:11px; color:var(--muted); }
@@ -39,10 +42,12 @@
 <div class="wrap">
   <header><h1>사천성<span class="tag">시험판</span></h1></header>
   <div class="hud">
-    <div class="stat"><b id="time">0:00</b><span>시간</span></div>
+    <div class="stat"><b id="stage">1</b><span>단계</span></div>
     <div class="stat"><b id="score">0</b><span>점수</span></div>
+    <div class="stat"><b id="time">0:00</b><span>남은 시간</span></div>
     <div class="stat"><b id="left">24</b><span>남은 짝</span></div>
   </div>
+  <div class="timebar"><i id="timeFill"></i></div>
   <canvas id="board"></canvas>
   <div class="tools">
     <button id="hintBtn">힌트 3</button>
@@ -56,17 +61,25 @@
   <h2>사천성</h2>
   <p>같은 강아지·고양이 두 마리를 눌러서 없애 줘</p>
   <p>둘 사이를 <b>꺾이는 곳 두 번 이하</b>인 선으로 이을 수 있어야 해. 판 바깥으로 돌아가도 돼</p>
+  <p>시간 안에 판을 다 비우면 다음 단계. 2단계부터는 짝을 없앨 때마다 남은 아이들이 한쪽으로 쏠려</p>
   <p class="muted">시험판이라 점수는 아직 저장되지 않아</p>
   <button class="main" id="startBtn">시작</button>
 </div></div>
 
+<div class="modal" id="clearBox"><div class="box">
+  <h2 id="clearTitle">1단계 성공</h2>
+  <p id="clearDetail"></p>
+  <p id="clearNext"></p>
+  <button class="main" id="nextBtn">다음 단계</button>
+</div></div>
+
 <div class="modal" id="endBox"><div class="box">
-  <h2>다 이었다</h2>
+  <h2>시간 끝</h2>
   <div class="big" id="endScore">0점</div>
   <p id="endDetail"></p>
   <p class="muted" id="endBest"></p>
   <p class="muted">광장이 열리면 이 점수가 모두의 점수에 더해질 예정이야</p>
-  <button class="main" id="againBtn">한 판 더</button>
+  <button class="main" id="againBtn">처음부터 다시</button>
 </div></div>
 
 <div id="err" style="display:none;position:fixed;left:0;right:0;bottom:0;background:#e8402f;color:#fff;font-size:12px;padding:6px 10px;z-index:9"></div>
@@ -110,8 +123,19 @@
   const px = (c) => (c === 0 ? m / 2 : c === COLS + 1 ? m + COLS * ts + m / 2 : m + (c - 1) * ts + ts / 2);
   const py = (r) => (r === 0 ? m / 2 : r === ROWS + 1 ? m + ROWS * th + m / 2 : m + (r - 1) * th + th / 2);
 
+  // ---------- 단계: 시간 제한 + 2단계부터 남은 아이들이 한쪽으로 쏠림 ----------
+  const STAGES = [
+    { time: 150, slide: null,    label: '기본' },
+    { time: 150, slide: 'down',  label: '아래로 쏠림' },
+    { time: 145, slide: 'left',  label: '왼쪽으로 쏠림' },
+    { time: 140, slide: 'up',    label: '위로 쏠림' },
+    { time: 135, slide: 'right', label: '오른쪽으로 쏠림' },
+  ];
+  const stageInfo = (n) => { const s = STAGES[(n - 1) % STAGES.length]; return { ...s, time: Math.max(90, s.time - Math.floor((n - 1) / STAGES.length) * 20) }; };
+
   // ---------- 판 ----------
-  let grid, sel, hint, pathFx, pops, startAt, endAt, score, combo, lastMatch, hintsLeft, shufflesLeft, running;
+  let grid, sel, hint, pathFx, pops, moving = [], score, combo, lastMatch, hintsLeft, shufflesLeft, running;
+  let stage = 1, deadline = 0, pausedLeft = null;
   const empty = (r, c) => r < 0 || c < 0 || r > ROWS + 1 || c > COLS + 1 ? false : grid[r][c] === null;
   function newGrid() {
     const kinds = [];
@@ -198,22 +222,51 @@
     pops.push({ r: a[0], c: a[1], kind, at: now }, { r: b[0], c: b[1], kind, at: now });
     grid[a[0]][a[1]] = null; grid[b[0]][b[1]] = null;
     sel = null; hint = null;
-    if (!remaining()) return finish();
-    if (!findMove()) { reshuffle(); toast('막혀서 섞었어'); }
+    deadline += 1000;   // 짝 하나에 1초 추가
+    if (!remaining()) return clearStage();
+    const dir = stageInfo(stage).slide;
+    if (dir) slide(dir, now);
+    if (!findMove()) { reshuffle(); moving = []; toast('막혀서 섞었어'); }
     updateHud();
   }
-  function finish() {
-    running = false; endAt = performance.now();
-    const sec = Math.round((endAt - startAt) / 1000);
-    const bonus = Math.max(0, 240 - sec) * 2;
-    score += bonus; updateHud();
-    let best = 0; try { best = +localStorage.getItem('doduk-link-best') || 0; if (score > best) localStorage.setItem('doduk-link-best', score); } catch {}
+  // 남은 아이들을 한쪽으로 밀기 (줄·칸마다 빈자리 없이 붙임). 움직인 타일은 잠깐 미끄러지듯 그림
+  function slide(dir, now) {
+    const lines = dir === 'down' || dir === 'up' ? COLS : ROWS, len = dir === 'down' || dir === 'up' ? ROWS : COLS;
+    for (let i = 1; i <= lines; i++) {
+      const cell = (j) => (dir === 'down' || dir === 'up' ? [j, i] : [i, j]);
+      const order = [];   // 미는 쪽 끝부터
+      for (let j = 1; j <= len; j++) order.push(dir === 'down' || dir === 'right' ? len + 1 - j : j);
+      const tiles = [];
+      for (const j of order) { const [r, c] = cell(j); if (grid[r][c] !== null) tiles.push({ kind: grid[r][c], from: [r, c] }); grid[r][c] = null; }
+      tiles.forEach((tl, k) => {
+        const [r, c] = cell(order[k]); grid[r][c] = tl.kind;
+        if (tl.from[0] !== r || tl.from[1] !== c) moving.push({ kind: tl.kind, fr: tl.from[0], fc: tl.from[1], tr: r, tc: c, at: now + 180 });
+      });
+    }
+  }
+  function bestScore() { let best = 0; try { best = +localStorage.getItem('doduk-link-best') || 0; if (score > best) localStorage.setItem('doduk-link-best', score); } catch {} return best; }
+  function clearStage() {
+    running = false;
+    const left = Math.max(0, Math.ceil((deadline - performance.now()) / 1000));
+    const bonus = left * 5;
+    score += bonus;
+    hintsLeft = Math.min(5, hintsLeft + 1); shufflesLeft = Math.min(3, shufflesLeft + 1);
+    updateHud();
+    const next = stageInfo(stage + 1);
     setTimeout(() => {
-      document.getElementById('endScore').textContent = `${score}점`;
-      document.getElementById('endDetail').textContent = `${fmt(sec)} 걸림 · 시간 보너스 ${bonus}점`;
-      document.getElementById('endBest').textContent = score > best ? '내 최고 기록' : `내 최고 기록 ${best}점`;
-      document.getElementById('endBox').classList.add('open');
+      document.getElementById('clearTitle').textContent = `${stage}단계 성공`;
+      document.getElementById('clearDetail').textContent = `남은 시간 ${left}초 · 보너스 ${bonus}점 · 지금 ${score}점`;
+      document.getElementById('clearNext').textContent = `다음은 ${stage + 1}단계: ${next.label}, ${next.time}초 (힌트·섞기 하나씩 더 줌)`;
+      document.getElementById('clearBox').classList.add('open');
     }, 500);
+  }
+  function timeUp() {
+    running = false; sel = null; hint = null; updateHud();
+    const best = bestScore();
+    document.getElementById('endScore').textContent = `${score}점`;
+    document.getElementById('endDetail').textContent = `${stage}단계까지 왔어`;
+    document.getElementById('endBest').textContent = score > best ? '내 최고 기록' : `내 최고 기록 ${best}점`;
+    document.getElementById('endBox').classList.add('open');
   }
 
   // ---------- 버튼 ----------
@@ -229,15 +282,40 @@
   document.getElementById('restartBtn').onclick = () => start();
   document.getElementById('startBtn').onclick = () => { document.getElementById('startBox').classList.remove('open'); start(); };
   document.getElementById('againBtn').onclick = () => { document.getElementById('endBox').classList.remove('open'); start(); };
+  document.getElementById('nextBtn').onclick = () => { document.getElementById('clearBox').classList.remove('open'); stage++; startStage(); };
 
   function start() {
-    newGrid(); sel = null; hint = null; pathFx = null; pops = [];
-    score = 0; combo = 0; lastMatch = -1e9; hintsLeft = 3; shufflesLeft = 1;
-    startAt = performance.now(); endAt = 0; running = true; updateHud();
+    score = 0; hintsLeft = 3; shufflesLeft = 1; stage = 1;
+    startStage();
   }
+  function startStage() {
+    newGrid(); sel = null; hint = null; pathFx = null; pops = []; moving = [];
+    combo = 0; lastMatch = -1e9;
+    const info = stageInfo(stage);
+    deadline = performance.now() + info.time * 1000; pausedLeft = null;
+    running = true; updateHud(); tickTime();
+    toast(`${stage}단계 · ${info.label}`);
+  }
+  // 남은 시간 표시 + 시간 끝 확인 (앱을 내리면 시간 멈춤)
+  function tickTime() {
+    if (!running) return;
+    const leftMs = Math.max(0, deadline - performance.now());
+    const total = stageInfo(stage).time * 1000;
+    document.getElementById('time').textContent = fmt(Math.ceil(leftMs / 1000));
+    const fill = document.getElementById('timeFill');
+    fill.style.width = `${Math.min(100, (leftMs / total) * 100)}%`;
+    fill.classList.toggle('low', leftMs < 20000);
+    if (leftMs <= 0) timeUp();
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!running) return;
+    if (document.hidden) pausedLeft = deadline - performance.now();
+    else if (pausedLeft !== null) { deadline = performance.now() + pausedLeft; pausedLeft = null; }
+  });
   const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   function updateHud() {
     dirty = true;
+    document.getElementById('stage').textContent = stage;
     document.getElementById('score').textContent = score;
     document.getElementById('left').textContent = remaining() / 2;
     document.getElementById('hintBtn').textContent = `힌트 ${hintsLeft}`;
@@ -285,7 +363,7 @@
     try {
       if (hint && now >= hint.until) { hint = null; dirty = true; }
       const hintOn = hint && now < hint.until;
-      const animating = hintOn || pops.length || (pathFx && now < pathFx.until + 50);
+      const animating = hintOn || pops.length || moving.length || (pathFx && now < pathFx.until + 50);
       if (dirty || animating) { draw(now, hintOn); dirty = false; }
     } catch (e) { const el = document.getElementById('err'); el.style.display = 'block'; el.textContent = '오류: ' + e.message; }
     requestAnimationFrame(frame);
@@ -297,11 +375,17 @@
     g.fillStyle = '#EFE4D2'; g.beginPath(); g.roundRect(0, 0, W, H, 16); g.fill();
     g.fillStyle = '#F7EFE2'; g.beginPath(); g.roundRect(m - 4, m - 4, COLS * ts + 8, ROWS * th + 8, 12); g.fill();
     if (!grid) return;
+    moving = moving.filter((mv) => now < mv.at);
+    const inMotion = new Set(moving.map((mv) => mv.tr * 100 + mv.tc));
     for (let r = 1; r <= ROWS; r++) for (let c = 1; c <= COLS; c++) {
-      if (grid[r][c] === null) continue;
+      if (grid[r][c] === null || inMotion.has(r * 100 + c)) continue;
       const isSel = sel && sel[0] === r && sel[1] === c;
       const isHint = hintOn && hint.cells.some(([hr, hc]) => hr === r && hc === c);
       drawTile(r, c, grid[r][c], t, { sel: isSel, hint: isHint });
+    }
+    for (const mv of moving) {   // 미끄러지는 중인 타일 (180ms)
+      const k = 1 - Math.max(0, mv.at - now) / 180, e = 1 - (1 - k) * (1 - k);
+      drawTile(mv.fr + (mv.tr - mv.fr) * e, mv.fc + (mv.tc - mv.fc) * e, mv.kind, t, {});
     }
     pops = pops.filter((p) => now - p.at < 260);
     for (const p of pops) { const k = (now - p.at) / 260; drawTile(p.r, p.c, p.kind, t, { scale: 1 + k * 0.25, alpha: 1 - k }); }
@@ -312,7 +396,7 @@
       g.globalAlpha = 1;
     }
   }
-  setInterval(() => { if (running) document.getElementById('time').textContent = fmt(Math.floor((performance.now() - startAt) / 1000)); }, 250);
+  setInterval(tickTime, 250);
 
   pops = [];
   layout(); newGrid(); updateHud(); running = false;
@@ -320,7 +404,7 @@
   let lastW = window.innerWidth;
   addEventListener('resize', () => { if (window.innerWidth !== lastW) { lastW = window.innerWidth; layout(); tileCache = {}; dirty = true; } });
   requestAnimationFrame(frame);
-  window.__link = { findPath, findMove, get grid() { return grid; }, match, remaining, frame };   // 시험용
+  window.__link = { findPath, findMove, get grid() { return grid; }, match, remaining, frame, get stage() { return stage; }, get score() { return score; }, setDeadline: (ms) => { deadline = performance.now() + ms; } };   // 시험용
 })();
 </script>
 </body>
