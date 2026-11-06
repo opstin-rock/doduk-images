@@ -10,9 +10,9 @@
   :root { --ink:#1f1f22; --cream:#fbf6ec; --yellow:#ffd54a; --red:#e8402f; --line:#2a2420; --muted:#6b6560; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body { margin:0; background:var(--cream); color:var(--ink); font-family:"Noto Sans KR",sans-serif; -webkit-text-size-adjust:100%; overscroll-behavior:none; }
-  .wrap { max-width:480px; margin:0 auto; padding:10px 8px 24px; }
-  header { display:flex; align-items:center; justify-content:space-between; padding:2px 6px 8px; }
-  h1 { font-family:"Jua",sans-serif; font-weight:400; font-size:24px; margin:0; }
+  .wrap { max-width:480px; margin:0 auto; padding:6px 8px 8px; }
+  header { display:flex; align-items:center; justify-content:space-between; padding:0 6px 4px; }
+  h1 { font-family:"Jua",sans-serif; font-weight:400; font-size:20px; margin:0; }
   .tag { font-size:11px; background:var(--line); color:#fff; border-radius:999px; padding:3px 8px; margin-left:6px; vertical-align:middle; }
   .hud { display:flex; gap:6px; padding:0 4px 6px; }
   .timebar { height:12px; margin:0 4px 8px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; }
@@ -149,7 +149,12 @@
   function layout() {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     const avail = Math.min(window.innerWidth, 480) - 16;
-    ts = Math.floor(avail / (COLS + 0.9)); th = Math.round(ts * 1.12); m = Math.round(ts * 0.45);
+    // 폭뿐 아니라 화면 높이에도 맞춤 (카카오톡 등 앱 안 브라우저는 아래 도구 막대 때문에 화면이 짧음 → 스크롤 없이 한 화면에)
+    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const others = document.querySelector('.wrap').offsetHeight - cv.offsetHeight;   // 판 말고 위아래 칸 높이
+    const availH = vh - others - 6;
+    const byW = Math.floor(avail / (COLS + 0.9)), byH = Math.floor(availH / (ROWS * 1.12 + 0.9));
+    ts = Math.max(30, Math.min(byW, byH)); th = Math.round(ts * 1.12); m = Math.round(ts * 0.45);
     W = COLS * ts + m * 2; H = ROWS * th + m * 2;
     cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
   }
@@ -564,8 +569,16 @@
   pops = [];
   layout(); newGrid(); updateHud(); running = false;
   // 앱 안 브라우저는 스크롤할 때 주소창이 숨었다 나타나며 높이만 바뀜 → 폭이 바뀔 때만 다시 맞춤
-  let lastW = window.innerWidth;
-  addEventListener('resize', () => { if (window.innerWidth !== lastW) { lastW = window.innerWidth; layout(); tileCache = {}; dirty = true; } });
+  // 폭이 바뀌거나 높이가 크게 바뀔 때만 다시 맞춤 (주소창이 살짝 들어갔다 나오는 정도는 무시)
+  let lastW = window.innerWidth, lastH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  function refit() {
+    const w = window.innerWidth, h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    if (w === lastW && Math.abs(h - lastH) < 60) return;
+    lastW = w; lastH = h; layout(); tileCache = {}; dirty = true;
+  }
+  addEventListener('resize', refit);
+  if (window.visualViewport) visualViewport.addEventListener('resize', refit);
+  setTimeout(() => { layout(); tileCache = {}; dirty = true; }, 300);   // 글꼴이 늦게 받아져 위아래 칸 높이가 바뀌는 경우
   requestAnimationFrame(frame);
   window.__link = { findPath, findMove, get grid() { return grid; }, match, remaining, frame, get stage() { return stage; }, get score() { return score; }, setDeadline: (ms) => { deadline = performance.now() + ms; } };   // 시험용
 })();
