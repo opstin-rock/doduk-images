@@ -45,6 +45,12 @@
   .box .big { font-family:"Jua",sans-serif; font-size:44px; margin:6px 0 2px; }
   .box .muted { color:var(--muted); font-size:12px; }
   .box button { margin-top:12px; width:100%; }
+  /* 한글이 낱말 중간에서 줄바꿈되지 않게 */
+  .box, .toast, .combo { word-break:keep-all; overflow-wrap:break-word; }
+  .sum { background:#fff; border:2px solid var(--line); border-radius:12px; padding:8px 12px; margin:4px 0 6px; text-align:left; }
+  .sum div { display:flex; justify-content:space-between; gap:10px; font-size:14px; line-height:1.9; }
+  .sum div b { font-family:"Jua",sans-serif; font-weight:400; font-size:16px; white-space:nowrap; }
+  .sum .total { border-top:1px dashed #c9bfae; margin-top:2px; padding-top:2px; }
   .modal { overflow-y:auto; }
   .rules { text-align:left; max-height:calc(100vh - 32px); overflow-y:auto; padding:18px 16px 16px; }
   .rules h2 { text-align:center; font-size:24px; }
@@ -105,7 +111,7 @@
 
 <div class="modal" id="clearBox"><div class="box">
   <h2 id="clearTitle">1판 다 깼다</h2>
-  <p id="clearDetail"></p>
+  <div class="sum" id="clearDetail"></div>
   <button class="main" id="nextBtn">다음 판</button>
 </div></div>
 
@@ -274,7 +280,7 @@
     running = false;
     const best = bestScore();
     document.getElementById('endScore').textContent = `${score}점`;
-    document.getElementById('endDetail').textContent = `${round}판까지 · 최고 ${bestStreak}연속`;
+    document.getElementById('endDetail').innerHTML = `${round}판까지 왔어<br>최고 ${bestStreak}연속`;
     document.getElementById('endBest').textContent = score > best ? '내 최고 기록' : `내 최고 기록 ${best}점`;
     setTimeout(() => document.getElementById('endBox').classList.add('open'), 500);
   }
@@ -283,7 +289,10 @@
     const bonus = 200 + stock.length * 20;
     score += bonus; updateHud(); confetti(performance.now());
     document.getElementById('clearTitle').textContent = `${round}판 다 깼다`;
-    document.getElementById('clearDetail').textContent = `다 깬 보너스 200 + 남은 더미 ${stock.length}장 x 20 = ${bonus}점 · 지금 ${score}점`;
+    document.getElementById('clearDetail').innerHTML =
+      `<div><span>다 깬 보너스</span><b>+200</b></div>` +
+      `<div><span>남은 더미 ${stock.length}장 × 20</span><b>+${stock.length * 20}</b></div>` +
+      `<div class="total"><span>지금까지 점수</span><b>${score}점</b></div>`;
     setTimeout(() => document.getElementById('clearBox').classList.add('open'), 600);
   }
   function bestScore() { let best = 0; try { best = +localStorage.getItem('doduk-peaks-best') || 0; if (score > best) localStorage.setItem('doduk-peaks-best', score); } catch {} return best; }
