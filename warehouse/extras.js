@@ -27,7 +27,7 @@
     { id: 'merge', name: '간식 합치기', x: 400, y: 1230, soon: true, body: '#8C7FA8' },
     { id: 'pair', name: '우리 애 짝 맞추기', x: 1040, y: 1230, soon: true, body: '#8C7FA8' },
   ];
-  const BOARD = { x: 720, y: 640, w: 440 };   // 모두의 점수 전광판 (위쪽 가운데)
+  const BOARD = { x: 646, y: 640, w: 560 };   // 사료 보내기 전광판 + 오른쪽 인증 사진 액자, 둘을 합쳐 가운데(720)에 오도록
   const nearGame = () => {
     if (!isPlaza()) return null;
     let best = null, bd = 62;
@@ -35,7 +35,18 @@
     return best;
   };
   let everyone = null, given = 0;   // 모두의 점수 합계, 이번 방문에 내가 보탠 점수
-  async function loadTotal() { const t = window.Score ? await Score.total() : null; if (t) everyone = t; }
+  let prog = null, ships = [], myKibbles = 0, proofImg = null;   // 사료알 진행, 발송 기록, 이번 방문에 내가 모은 알, 인증 사진
+  async function loadTotal() {
+    if (!window.Score) return;
+    const [t, p, s] = await Promise.all([Score.total(), Score.progress(), Score.shipments()]);
+    if (t) everyone = t;
+    if (p) prog = p;
+    if (s) {
+      ships = s;
+      const photo = (s.find((x) => x.photo_url) || {}).photo_url;
+      if (photo && (!proofImg || proofImg.src !== photo)) { proofImg = new Image(); proofImg.src = photo; }
+    }
+  }
   if (!film) { loadTotal(); setInterval(loadTotal, 20000); }
 
   function drawCabinet(gm, t) {
@@ -68,24 +79,51 @@
     R(ctx, x - w / 2, y + 10, w, 26, 8); ctx.fillStyle = '#2B2622'; ctx.fill();
     ctx.fillStyle = '#FFD54A'; ctx.fillText(gm.name, x, y + 28);
   }
-  // 전광판: 다리 달린 큰 화면. y는 다리 밑동, 화면은 그 위 (높이 190)
+  // 전광판: 다리 달린 큰 화면. y는 다리 밑동, 화면은 그 위
+  //   보호소에 사료 보내기: 한 판 = 사료 한 알, 300알마다 사료나 간식 1개 (보낼 곳은 정하는 중)
+  //   왼쪽 액자: 최근 인증 사진 (shipments.photo_url)
+  const kib = (n) => Number(n || 0).toLocaleString('ko-KR');
+  function drawKibble(cx, cy, r, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.8, 0.4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.arc(cx - r * 0.3, cy - r * 0.25, r * 0.3, 0, Math.PI * 2); ctx.fill(); }
   function drawBoard(t) {
-    const { x, y, w } = BOARD, top = y - 300, hgt = 190;
+    const { x, y, w } = BOARD, top = y - 330, hgt = 236;
     ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3;
     ctx.fillStyle = '#3A3550'; ctx.fillRect(x - w / 2 + 30, top + hgt - 4, 12, y - top - hgt + 4); ctx.fillRect(x + w / 2 - 42, top + hgt - 4, 12, y - top - hgt + 4);   // 다리
     ctx.save(); ctx.shadowColor = NEON_PINK; ctx.shadowBlur = 18;
     R(ctx, x - w / 2, top, w, hgt, 16); ctx.fillStyle = '#16122E'; ctx.fill(); ctx.restore();
     ctx.strokeStyle = '#FF5DA2'; ctx.lineWidth = 4; R(ctx, x - w / 2, top, w, hgt, 16); ctx.stroke();
-    // 반짝이는 테두리 전구
     const n = Math.floor(w / 16);
     for (let i = 0; i < n; i++) { const on = Math.sin(t * 5 + i) > 0; ctx.fillStyle = on ? '#FFD54A' : 'rgba(255,213,74,.25)'; ctx.beginPath(); ctx.arc(x - w / 2 + 14 + i * ((w - 28) / (n - 1)), top + 12, 3.5, 0, Math.PI * 2); ctx.fill(); }
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#fff'; ctx.font = '22px Jua'; ctx.fillText('모두의 점수', x, top + 46);
-    ctx.save(); ctx.shadowColor = '#FFD54A'; ctx.shadowBlur = 12; ctx.fillStyle = '#FFD54A'; ctx.font = '58px Jua';
-    ctx.fillText(everyone ? Number(everyone.total).toLocaleString('ko-KR') : '-', x, top + 110); ctx.restore();
-    ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = '17px Jua';
-    ctx.fillText(everyone ? `오늘 +${Number(everyone.today).toLocaleString('ko-KR')} · 모은 만큼 보호소로 보낼 거야` : '모은 만큼 보호소로 보낼 거야', x, top + 142);
-    if (given) { ctx.fillStyle = '#7BC67E'; ctx.fillText(`내가 보탠 점수 +${given.toLocaleString('ko-KR')}`, x, top + 170); }
+    ctx.fillStyle = '#fff'; ctx.font = '24px Jua'; ctx.fillText('보호소에 사료 보내기', x, top + 46);
+    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.font = '15px Jua'; ctx.fillText('게임 한 판 = 사료 한 알 · 300알마다 사료나 간식 1개 · 보낼 곳은 정하는 중', x, top + 70);
+    // 진행 막대
+    const goal = prog ? prog.goal : 300, cur = prog ? Math.min(prog.current, goal) : 0, done = prog && prog.current >= goal;
+    const bx = x - w / 2 + 28, bw = w - 56, by = top + 86, bh = 34;
+    R(ctx, bx, by, bw, bh, 17); ctx.fillStyle = '#2B2550'; ctx.fill();
+    if (cur > 0) { R(ctx, bx, by, Math.max(34, bw * (cur / goal)), bh, 17); ctx.fillStyle = done ? (Math.sin(t * 6) > 0 ? '#FFD54A' : '#FF8A3D') : '#C9965F'; ctx.fill(); }
+    for (let i = 0; i < Math.min(14, Math.floor((bw * (cur / goal)) / 26)); i++) drawKibble(bx + 16 + i * 26, by + bh / 2, 7, i % 2 ? '#8A5C37' : '#A8754A');   // 막대 속 사료알
+    ctx.strokeStyle = '#FFD54A'; ctx.lineWidth = 2; R(ctx, bx, by, bw, bh, 17); ctx.stroke();
+    ctx.save(); ctx.shadowColor = '#FFD54A'; ctx.shadowBlur = 10; ctx.fillStyle = '#FFD54A'; ctx.font = '40px Jua';
+    ctx.fillText(prog ? (done ? '목표 달성! 보내는 중' : `${kib(cur)} / ${kib(goal)}알`) : '- / 300알', x, by + bh + 46); ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,.88)'; ctx.font = '17px Jua';
+    const dog = prog ? prog.today_dog : 0, cat = prog ? prog.today_cat : 0;
+    ctx.fillText(`오늘 +${kib(prog ? prog.today : 0)}알 · 강아지팀 ${kib(dog)} vs 고양이팀 ${kib(cat)}`, x, by + bh + 76);
+    ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.font = '14px Jua';
+    ctx.fillText(`지금까지 보낸 것 ${kib(prog ? prog.sent : 0)}번 · 모두의 점수 ${everyone ? kib(everyone.total) : '-'}${myKibbles ? ` · 내가 모은 사료 ${myKibbles}알` : ''}`, x, by + bh + 100);
+    // 인증 사진 액자 (전광판 오른쪽)
+    const fx = x + w / 2 + 20, fy = top + 40, fw = 128, fh = 150;
+    ctx.save(); ctx.translate(fx + fw / 2, fy + fh / 2); ctx.rotate(-0.05);
+    R(ctx, -fw / 2, -fh / 2, fw, fh, 8); ctx.fillStyle = '#F7EFE2'; ctx.fill(); ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3; ctx.stroke();
+    if (proofImg && proofImg.complete && proofImg.naturalWidth) {
+      const k = Math.max((fw - 16) / proofImg.naturalWidth, (fh - 44) / proofImg.naturalHeight);
+      ctx.save(); R(ctx, -fw / 2 + 8, -fh / 2 + 8, fw - 16, fh - 44, 4); ctx.clip();
+      ctx.drawImage(proofImg, -proofImg.naturalWidth * k / 2, -fh / 2 + 8 + (fh - 44) / 2 - proofImg.naturalHeight * k / 2, proofImg.naturalWidth * k, proofImg.naturalHeight * k); ctx.restore();
+    } else {
+      ctx.fillStyle = '#E3D8C6'; R(ctx, -fw / 2 + 8, -fh / 2 + 8, fw - 16, fh - 44, 4); ctx.fill();
+      ctx.fillStyle = '#9A8E7C'; ctx.font = '13px Jua'; ctx.fillText('첫 인증 사진이', 0, -12); ctx.fillText('여기 걸려', 0, 8);
+    }
+    ctx.fillStyle = '#2a2420'; ctx.font = '14px Jua'; ctx.fillText(ships.length ? `${ships[0].round}번째 보낸 사진` : '보낸 사진', 0, fh / 2 - 14);
+    ctx.restore();
   }
   const NEON_PINK = '#FF5DA2';
 
@@ -97,7 +135,7 @@
     openGame = gm;
     document.getElementById('gameTitle').textContent = gm.name;
     document.getElementById('gameGive').textContent = '';
-    gameFrame.src = gm.url;
+    gameFrame.src = `${gm.url}&team=${BREEDS[me.breed]?.kind === 'cat' ? 'cat' : 'dog'}`;   // 강아지팀/고양이팀
     gameBox.classList.add('open'); window.plazaPaused = true;
     speech.set(myId, { text: `${gm.name} 하러 감`, until: Date.now() + 2500 });
   }
@@ -114,10 +152,17 @@
   document.getElementById('gameClose').onclick = closeArcade;
   addEventListener('message', (e) => {
     const d = e.data;
+    if (d && d.type === 'doduk-kibble') {   // 사료 한 알 모음 → 전광판 막대 바로 올리기
+      myKibbles++;
+      if (prog) { prog = { ...prog, total: prog.total + 1, current: prog.current + 1, today: prog.today + 1, [d.team === 'cat' ? 'today_cat' : 'today_dog']: (prog[d.team === 'cat' ? 'today_cat' : 'today_dog'] || 0) + 1 }; }
+      document.getElementById('gameGive').textContent = `사료 +${myKibbles}알`;
+      setTimeout(loadTotal, 1500);
+      return;
+    }
     if (!d || d.type !== 'doduk-score' || !(d.score > 0)) return;
     given += d.score;
     if (everyone) { everyone = { ...everyone, total: Number(everyone.total) + d.score, today: Number(everyone.today) + d.score }; }
-    document.getElementById('gameGive').textContent = `+${given.toLocaleString('ko-KR')} 보탬`;
+    if (!myKibbles) document.getElementById('gameGive').textContent = `+${given.toLocaleString('ko-KR')}점`;
     setTimeout(loadTotal, 1500);
   });
 
