@@ -989,27 +989,33 @@ function stepBot(dt, now) {
   if (bot.x === HOME.x && bot.y === HOME.y) { if (!bot.home) { bot.home = true; bot.idleSince = now; } }
   else { bot.tx = HOME.x; bot.ty = HOME.y; }
 }
+// 혼자 움직이는 빗자루 (2026-11-09: 빗자루 든 도둑냥 대신 빗자루만). 바닥에 닿는 솔 끝이 기준점
 function drawBot(t, now) {
-  const h = 104, w = doduk.naturalWidth ? (doduk.naturalWidth / doduk.naturalHeight) * h : 0;
+  const h = 104;
   const cleaning = bot.cleanUntil > now;
-  ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(bot.x, bot.y, 34, 10, 0, 0, Math.PI * 2); ctx.fill();
-  // 빗자루 (청소하러 다닐 때만)
-  if (!bot.home) {
-    const swing = cleaning ? Math.sin(t * 18) * 0.5 : Math.sin(t * 8) * 0.1;
-    ctx.save(); ctx.translate(bot.x - 30, bot.y - 50); ctx.rotate(-0.5 + swing);
-    ctx.fillStyle = '#8A5C37'; ctx.fillRect(-3, 0, 6, 62);
-    ctx.beginPath(); ctx.moveTo(-14, 60); ctx.lineTo(14, 60); ctx.lineTo(18, 82); ctx.lineTo(-18, 82); ctx.closePath();
-    ctx.fillStyle = '#E8C46A'; ctx.fill(); ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.restore();
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(bot.x, bot.y, 26, 8, 0, 0, Math.PI * 2); ctx.fill();
+  const hop = bot.walking ? Math.abs(Math.sin(t * 12)) * 12 : 0;               // 이동: 콩콩 뛰기
+  const tilt = cleaning ? Math.sin(t * 18) * 0.55                              // 청소: 좌우로 쓱쓱
+    : bot.walking ? Math.sin(t * 12) * 0.15 : 0.12 + Math.sin(t * 2) * 0.04;   // 쉴 때: 살짝 기대 서기
+  ctx.save(); ctx.translate(bot.x, bot.y - hop); ctx.rotate(tilt); ctx.scale(1.25, 1.25);   // 잘 보이게 조금 크게
+  ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+  // 자루
+  ctx.fillStyle = '#A8754A'; rr(-4, -h, 8, h - 30, 4); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#E8402F'; rr(-6, -h, 12, 8, 3); ctx.fill(); ctx.stroke();   // 손잡이 끝
+  // 묶은 끈
+  ctx.fillStyle = '#E8402F'; rr(-13, -34, 26, 8, 3); ctx.fill(); ctx.stroke();
+  // 솔
+  ctx.beginPath(); ctx.moveTo(-12, -27); ctx.lineTo(12, -27); ctx.lineTo(22, 0); ctx.lineTo(-22, 0); ctx.closePath();
+  ctx.fillStyle = '#E8C46A'; ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = 'rgba(138,92,55,.6)'; ctx.lineWidth = 1.5;
+  for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(i * 3.2, -25); ctx.lineTo(i * 6.4, -2); ctx.stroke(); }
+  ctx.restore();
+  // 쓸 때 먼지
+  if (cleaning) {
+    ctx.fillStyle = 'rgba(200,190,170,.7)';
+    for (let i = 0; i < 4; i++) { const k = ((t * 2 + i / 4) % 1); ctx.globalAlpha = 1 - k; ctx.beginPath(); ctx.arc(bot.x + (i % 2 ? 1 : -1) * (14 + k * 26), bot.y - 6 - k * 18, 4 + k * 5, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 1;
   }
-  if (w) {
-    const bob = bot.walking ? -Math.abs(Math.sin(t * 12)) * 7 : Math.sin(t * 3) * 2;
-    ctx.save(); ctx.translate(bot.x, bot.y + bob);
-    if (bot.walking) ctx.rotate(Math.sin(t * 12) * 0.06);
-    ctx.drawImage(doduk, -w / 2, -h, w, h);
-    ctx.restore();
-  }
-  label('도둑냥', bot.x, bot.y + 26, '#2B2622', '#FFD54A', '16px Jua');
   // 반짝이
   ctx.fillStyle = '#FFD54A';
   bot.sparkles = bot.sparkles.filter((s) => now - s.start < 700);
@@ -1019,7 +1025,7 @@ function drawBot(t, now) {
     ctx.beginPath(); ctx.arc(s.x + Math.cos(s.a) * r, s.y + Math.sin(s.a) * r * 0.6, 5, 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
-  return bot.y - h - 6;
+  return bot.y - h * 1.25 - 6 - hop;
 }
 
 // ---------- 도둑냥 점집 (타로) ----------
