@@ -25,6 +25,8 @@ window.Score = (() => {
     score = Math.floor(score);
     if (!(score >= 1)) return true;
     lsSet(MINE, lsGet(MINE, 0) + score);
+    // 광장 안에서 열린 게임이면 광장에 알려 줌 (전광판 숫자 바로 올리기)
+    if (window.parent !== window) { try { window.parent.postMessage({ type: 'doduk-score', game, score }, '*'); } catch {} }
     let allOk = true;
     for (let left = score; left > 0; left -= 30000) {
       const part = Math.min(30000, left);
