@@ -15,189 +15,94 @@
   const R = (g, x, y, w, h, r) => { g.beginPath(); g.roundRect(x, y, w, h, r); };
 
   // =====================================================================
-  // 오락실: 점프 미니게임
+  // 오락실: 광장 왼쪽에 게임기 2대 + 위에 "모두의 점수" 전광판
+  // 게임기 앞에 서면 버튼이 뜨고, 누르면 게임(lab/*.html)을 광장 위에 화면 전체로 띄움 (iframe)
+  // 게임에서 점수를 보내면 postMessage로 알려 줘서 전광판 숫자를 바로 올림
   // =====================================================================
-  const ARCADE = { x: 250, y: 1190 };
-  const nearArcade = () => isPlaza() && Math.abs(me.x - ARCADE.x) < 100 && me.y > ARCADE.y - 10 && me.y < ARCADE.y + 110;
-  let board = [];   // [{breed, score}] 오늘 상위
-  async function loadBoard() {
-    if (db) {
-      const { data, error } = await db.from('game_scores').select('breed,score').eq('day', kstDate()).order('score', { ascending: false }).limit(10);
-      if (!error && data) { board = data; return; }
-    }
-    board = lsGet(`doduk-jump-${kstDate()}`, []).slice(0, 10);
-  }
-  async function submitScore(score) {
-    const local = lsGet(`doduk-jump-${kstDate()}`, []);
-    local.push({ breed: me.breed, score }); local.sort((a, b) => b.score - a.score);
-    lsSet(`doduk-jump-${kstDate()}`, local.slice(0, 20));
-    let rank = null;
-    if (db) {
-      const ins = await db.from('game_scores').insert({ breed: me.breed, score });
-      if (!ins.error) {
-        const { count } = await db.from('game_scores').select('id', { count: 'exact', head: true }).eq('day', kstDate()).gt('score', score);
-        if (Number.isFinite(count)) rank = count + 1;
-      }
-    }
-    if (rank === null) rank = local.findIndex((r) => r.score === score) + 1;
-    await loadBoard();
-    return rank;
-  }
-  loadBoard(); setInterval(loadBoard, 60000);
-
-  function drawArcade(t) {
-    const { x, y } = ARCADE;
-    ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y + 4, 70, 14, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3;
-    R(ctx, x - 50, y - 150, 100, 150, 12); ctx.fillStyle = '#E8402F'; ctx.fill(); ctx.stroke();
-    R(ctx, x - 38, y - 136, 76, 58, 6); ctx.fillStyle = '#1E2233'; ctx.fill(); ctx.stroke();
-    // 화면 속 작은 점프 그림
-    const jy = Math.abs(Math.sin(t * 3)) * 16;
-    ctx.fillStyle = '#FFD54A'; ctx.fillRect(x - 24, y - 92 - jy, 12, 10);
-    ctx.fillStyle = '#7B9E6B'; ctx.fillRect(x + 6 - ((t * 30) % 40), y - 90, 10, 8);
-    ctx.fillStyle = '#2B2622'; R(ctx, x - 40, y - 66, 80, 22, 6); ctx.fill();
-    ctx.fillStyle = '#FFD54A'; ctx.beginPath(); ctx.arc(x - 18, y - 55, 6, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#8FC9E8'; ctx.beginPath(); ctx.arc(x + 16, y - 55, 6, 0, Math.PI * 2); ctx.fill();
-    // 위 간판 + 오늘의 점프왕
-    R(ctx, x - 95, y - 330, 190, 168, 12); ctx.fillStyle = '#2B2622'; ctx.fill(); ctx.stroke();
-    ctx.textAlign = 'center'; ctx.fillStyle = '#FFD54A'; ctx.font = '22px Jua'; ctx.fillText('오늘의 점프왕', x, y - 300);
-    ctx.font = '17px Jua';
-    const top = board.slice(0, 5);
-    if (!top.length) { ctx.fillStyle = '#ccc'; ctx.fillText('아직 기록 없음', x, y - 250); ctx.fillText('1등 해 봐', x, y - 226); }
-    top.forEach((r, i) => {
-      ctx.textAlign = 'left'; ctx.fillStyle = i === 0 ? '#FFD54A' : '#fff';
-      ctx.fillText(`${i + 1}. ${(BREEDS[r.breed]?.name ?? '?').slice(0, 7)}`, x - 82, y - 270 + i * 23);
-      ctx.textAlign = 'right'; ctx.fillText(String(r.score), x + 82, y - 270 + i * 23);
-    });
-    ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = '18px Jua';
-    R(ctx, x - 52, y + 10, 104, 28, 8); ctx.fillStyle = '#2B2622'; ctx.fill();
-    ctx.fillStyle = '#FFD54A'; ctx.fillText('도둑냥 오락실', x, y + 30);
-  }
-
-  // 게임 화면
-  const gameEl = document.getElementById('jumpGame');
-  const gcv = document.getElementById('jumpCv');
-  const g = gcv.getContext('2d');
-  const GW = 720, GH = 480, GROUND = 400, PX = 150;
-  let run = null;   // 진행 중 게임 상태
-  function jumpPower(b) { return 860 + Math.max(-140, Math.min(180, ((b.legH ?? 10) - 10) * 20)); }
-  function newRun() {
-    const b = BREEDS[me.breed];
-    return { b, y: 0, vy: 0, score: 0, speed: 330, obs: [], treats: [], next: 1.2, nextTreat: 3, over: false, t: 0, last: performance.now(), raf: 0 };
-  }
-  const OBS = [
-    { w: 58, h: 48, draw: (x, y) => { g.fillStyle = '#C9965F'; R(g, x, y, 58, 48, 4); g.fill(); g.stroke(); g.fillStyle = '#E3C48F'; g.fillRect(x + 23, y + 1, 12, 46); } },   // 택배 상자
-    { w: 40, h: 62, draw: (x, y) => { g.fillStyle = '#F28C28'; g.beginPath(); g.moveTo(x + 20, y); g.lineTo(x + 40, y + 62); g.lineTo(x, y + 62); g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#fff'; g.fillRect(x + 11, y + 30, 18, 7); } },   // 고깔
-    { w: 86, h: 54, draw: (x, y) => {   // 청소기
-      g.fillStyle = '#8FC9E8'; R(g, x + 30, y + 14, 56, 40, 12); g.fill(); g.stroke();
-      g.fillStyle = '#2a2420'; g.beginPath(); g.arc(x + 44, y + 54, 7, 0, Math.PI * 2); g.arc(x + 74, y + 54, 7, 0, Math.PI * 2); g.fill();
-      g.lineWidth = 6; g.strokeStyle = '#555'; g.beginPath(); g.moveTo(x + 32, y + 24); g.quadraticCurveTo(x + 6, y + 10, x + 4, y + 50); g.stroke(); g.lineWidth = 3; g.strokeStyle = '#2a2420';
-    } },
-    { w: 70, h: 30, draw: (x, y) => { g.fillStyle = '#F0E6D8'; R(g, x, y, 70, 30, 6); g.fill(); g.stroke(); g.fillStyle = '#E8402F'; g.fillRect(x + 4, y + 10, 62, 6); } },   // 목욕 수건
+  const GAMES = [
+    { id: 'sacheon', name: '사천성', x: 228, y: 1190, url: 'lab/link.html?embed=1&v=12', body: '#E8402F', screen: 'sacheon' },
+    { id: 'peaks', name: '트라이피크', x: 348, y: 1190, url: 'lab/peaks.html?embed=1&v=7', body: '#3D7BD9', screen: 'peaks' },
   ];
-  function drawGame(r) {
-    const t = r.t;
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    const sky = g.createLinearGradient(0, 0, 0, GH); sky.addColorStop(0, '#CDE8FB'); sky.addColorStop(1, '#F7F1E6');
-    g.fillStyle = sky; g.fillRect(0, 0, GW, GH);
-    // 구름·뒷배경 (천천히 흐름)
-    g.fillStyle = 'rgba(255,255,255,.9)';
-    for (let i = 0; i < 4; i++) { const cx = ((i * 240 - t * 30) % (GW + 200) + GW + 200) % (GW + 200) - 100; g.beginPath(); g.ellipse(cx, 70 + (i % 2) * 40, 50, 18, 0, 0, Math.PI * 2); g.fill(); }
-    g.fillStyle = '#B9D99A'; g.fillRect(0, GROUND, GW, GH - GROUND);
-    g.fillStyle = '#94BE73'; for (let x = -((t * r.speed) % 60); x < GW; x += 60) g.fillRect(x, GROUND + 18, 30, 6);
-    g.strokeStyle = '#2a2420'; g.lineWidth = 3;
-    for (const o of r.obs) OBS[o.k].draw(o.x, GROUND - OBS[o.k].h);
-    for (const tr of r.treats) { if (tr.got) continue; g.save(); g.translate(tr.x, tr.y); g.rotate(Math.sin(t * 4 + tr.x) * 0.2); g.fillStyle = '#F2D9A6'; R(g, -14, -5, 28, 10, 4); g.fill(); g.stroke(); for (const [bx, by] of [[-15, -5], [-15, 5], [15, -5], [15, 5]]) { g.beginPath(); g.arc(bx, by, 6, 0, Math.PI * 2); g.fill(); g.stroke(); } g.fillRect(-12, -4, 24, 8); g.restore(); }
-    // 내 캐릭터 (오른쪽 보고 달림)
-    g.save(); g.translate(PX, GROUND - r.y); g.scale(1.25, 1.25);
-    drawPet(g, { breed: me.breed, acc: me.acc, x: 0, y: 0, tx: r.over ? 0 : 5, ty: 0, face: 1, noTag: true }, r.over ? 0 : t * 1.4, false);
-    g.restore();
-    g.textAlign = 'right'; g.fillStyle = '#2a2420'; g.font = '34px Jua'; g.fillText(String(Math.floor(r.score)), GW - 24, 50);
-    if (r.over) {
-      g.fillStyle = 'rgba(20,18,16,.55)'; g.fillRect(0, 0, GW, GH);
-      g.textAlign = 'center'; g.fillStyle = '#FFD54A'; g.font = '64px Jua'; g.fillText('꽈당', GW / 2, 200);
-      g.fillStyle = '#fff'; g.font = '36px Jua'; g.fillText(`${Math.floor(r.score)}점`, GW / 2, 255);
-      if (r.rank) { g.font = '26px Jua'; g.fillText(`오늘 ${r.rank}등`, GW / 2, 300); }
-    } else if (r.t < 1.2) {
-      g.textAlign = 'center'; g.fillStyle = '#2a2420'; g.font = '30px Jua'; g.fillText('화면을 누르면 점프', GW / 2, 160);
-    }
-  }
-  function hit(r, o) {
-    const ob = OBS[o.k], s = 1.25 * (r.b.size ?? 1);
-    const pw = 24 * s, ph = 40 * s;
-    const px1 = PX - pw, px2 = PX + pw, py1 = GROUND - r.y - ph, py2 = GROUND - r.y;
-    return px2 - 8 > o.x + 6 && px1 + 8 < o.x + ob.w - 6 && py2 - 4 > GROUND - ob.h + 4 && py1 < GROUND;
-  }
-  function tick(now) {
-    const r = run; if (!r || r.over) return;
-    const dt = Math.min(0.033, (now - r.last) / 1000); r.last = now; r.t += dt;
-    r.speed = Math.min(900, 330 + r.t * 14);
-    r.score += dt * r.speed / 30;
-    // 점프 물리
-    if (r.y > 0 || r.vy > 0) { r.vy -= 2500 * dt; r.y = Math.max(0, r.y + r.vy * dt); if (r.y === 0) r.vy = 0; }
-    // 장애물·간식
-    r.next -= dt; r.nextTreat -= dt;
-    if (r.next <= 0) { r.obs.push({ k: Math.floor(Math.random() * OBS.length), x: GW + 20 }); r.next = (0.9 + Math.random() * 1.0) * (520 / r.speed) * 1.6; }
-    if (r.nextTreat <= 0) { r.treats.push({ x: GW + 20, y: GROUND - 120 - Math.random() * 110, got: false }); r.nextTreat = 2 + Math.random() * 3; }
-    for (const o of r.obs) o.x -= r.speed * dt;
-    for (const tr of r.treats) tr.x -= r.speed * dt;
-    r.obs = r.obs.filter((o) => o.x > -120); r.treats = r.treats.filter((tr) => tr.x > -40);
-    for (const tr of r.treats) if (!tr.got && Math.abs(tr.x - PX) < 34 && Math.abs(tr.y - (GROUND - r.y - 30)) < 46) { tr.got = true; r.score += 25; }
-    if (r.obs.some((o) => hit(r, o))) { endRun(r); return drawGame(r); }
-    drawGame(r);
-    r.raf = requestAnimationFrame(tick);
-  }
-  async function endRun(r) {
-    r.over = true;
-    const score = Math.floor(r.score);
-    document.getElementById('jumpAgain').style.display = '';
-    document.getElementById('jumpSave').style.display = '';
-    r.rank = await submitScore(score).catch(() => null);
-    drawGame(r);
-  }
-  function jump() {
-    if (!run) return;
-    if (run.over) return;
-    if (run.y === 0) run.vy = jumpPower(run.b);
-  }
-  function startRun() {
-    if (run) cancelAnimationFrame(run.raf);
-    run = newRun();
-    document.getElementById('jumpAgain').style.display = 'none';
-    document.getElementById('jumpSave').style.display = 'none';
-    run.last = performance.now();
-    run.raf = requestAnimationFrame(tick);
-  }
-  gcv.addEventListener('pointerdown', (e) => { e.preventDefault(); jump(); });
-  addEventListener('keydown', (e) => { if (gameEl.classList.contains('open') && (e.code === 'Space' || e.code === 'ArrowUp')) { e.preventDefault(); jump(); } });
-  document.getElementById('jumpAgain').onclick = startRun;
-  document.getElementById('jumpClose').onclick = () => { if (run) cancelAnimationFrame(run.raf); run = null; gameEl.classList.remove('open'); };
-  document.getElementById('jumpSave').onclick = () => {
-    if (!run) return;
-    const score = Math.floor(run.score), rank = run.rank;
-    gameEl.classList.remove('open');
-    showPhoto(makeJumpCard(score, rank));
+  const BOARD = { x: 288, y: 1190 };   // 왼쪽 벽 포토존 간판(~x135)과 오른쪽 벤치(~x400) 사이
+  const nearGame = () => {
+    if (!isPlaza()) return null;
+    let best = null, bd = 80;
+    for (const gm of GAMES) { const d = Math.abs(me.x - gm.x); if (d < bd && me.y > gm.y - 10 && me.y < gm.y + 110) { bd = d; best = gm; } }
+    return best;
   };
-  function makeJumpCard(score, rank) {
-    const CW = 1080, CH = 1350, c = document.createElement('canvas'); c.width = CW; c.height = CH;
-    const q = c.getContext('2d');
-    const sky = q.createLinearGradient(0, 0, 0, CH); sky.addColorStop(0, '#CDE8FB'); sky.addColorStop(1, '#F7F1E6');
-    q.fillStyle = sky; q.fillRect(0, 0, CW, CH);
-    q.fillStyle = '#B9D99A'; q.fillRect(0, 900, CW, 450);
-    q.fillStyle = '#2B2622'; q.fillRect(0, 0, CW, 130);
-    q.textAlign = 'center'; q.fillStyle = '#FFD54A'; q.font = '60px Jua'; q.fillText('도둑냥 오락실 점프왕', CW / 2, 88);
-    q.save(); q.translate(CW / 2, 860); q.scale(4, 4);
-    drawPet(q, { breed: me.breed, acc: me.acc, x: 0, y: 0, tx: 0, ty: 0, face: 1, noTag: true }, 0.5, false);
-    q.restore();
-    q.fillStyle = '#2a2420'; q.font = '120px Jua'; q.fillText(`${score}점`, CW / 2, 1060);
-    q.font = '48px Jua'; q.fillText(`${BREEDS[me.breed].name}${rank ? ` · 오늘 ${rank}등` : ''}`, CW / 2, 1130);
-    q.fillStyle = '#2B2622'; q.fillRect(0, CH - 130, CW, 130);
-    q.fillStyle = '#FFD54A'; q.font = '50px Jua'; q.fillText('@doduk_nyang', CW / 2, CH - 70);
-    q.fillStyle = '#fff'; q.font = '26px "Noto Sans KR"'; q.fillText('이 점수 넘겨 봐', CW / 2, CH - 30);
-    return c;
+  let everyone = null, given = 0;   // 모두의 점수 합계, 이번 방문에 내가 보탠 점수
+  async function loadTotal() { const t = window.Score ? await Score.total() : null; if (t) everyone = t; }
+  if (!film) { loadTotal(); setInterval(loadTotal, 20000); }
+
+  function drawCabinet(gm, t) {
+    const { x, y } = gm;
+    ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x, y + 4, 52, 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3;
+    R(ctx, x - 44, y - 140, 88, 140, 12); ctx.fillStyle = gm.body; ctx.fill(); ctx.stroke();
+    R(ctx, x - 34, y - 128, 68, 54, 6); ctx.fillStyle = '#1E2233'; ctx.fill(); ctx.stroke();
+    // 화면 속 작은 그림
+    if (gm.screen === 'sacheon') {
+      const cols = ['#FFE3C2', '#E6F4FF', '#FDE4EC', '#DDF2E3'];
+      for (let i = 0; i < 6; i++) { const cx = x - 27 + (i % 3) * 19, cy = y - 121 + Math.floor(i / 3) * 22; ctx.fillStyle = cols[(i + Math.floor(t * 2)) % 4]; ctx.fillRect(cx, cy, 15, 18); }
+      ctx.strokeStyle = '#E8402F'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 20, y - 103); ctx.lineTo(x - 20, y - 78); ctx.lineTo(x + 18, y - 78); ctx.lineTo(x + 18, y - 81); ctx.stroke();
+    } else {
+      ctx.fillStyle = '#5E9E6E'; ctx.fillRect(x - 33, y - 127, 66, 52);
+      for (const [dx, dy, back] of [[-18, -118, 1], [0, -118, 1], [18, -118, 1], [-9, -104, 0], [9, -104, 0]]) { ctx.fillStyle = back ? '#C9965F' : '#FFFDF8'; ctx.fillRect(x + dx - 6, y + dy, 12, 16); }
+      const jy = Math.abs(Math.sin(t * 3)) * 4; ctx.fillStyle = '#FFFDF8'; ctx.fillRect(x - 6, y - 88 - jy, 12, 12);
+    }
+    ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3;
+    ctx.fillStyle = '#2B2622'; R(ctx, x - 36, y - 62, 72, 20, 6); ctx.fill();
+    ctx.fillStyle = '#FFD54A'; ctx.beginPath(); ctx.arc(x - 16, y - 52, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#8FC9E8'; ctx.beginPath(); ctx.arc(x + 14, y - 52, 5, 0, Math.PI * 2); ctx.fill();
+    // 이름표
+    ctx.textAlign = 'center'; ctx.font = '17px Jua';
+    const w = ctx.measureText(gm.name).width + 18;
+    R(ctx, x - w / 2, y + 10, w, 26, 8); ctx.fillStyle = '#2B2622'; ctx.fill();
+    ctx.fillStyle = '#FFD54A'; ctx.fillText(gm.name, x, y + 28);
   }
+  function drawBoard(t) {
+    const { x, y } = BOARD;
+    ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3;
+    ctx.fillStyle = '#5B4636'; ctx.fillRect(x - 128, y - 300, 8, 150); ctx.fillRect(x + 120, y - 300, 8, 150);   // 기둥
+    R(ctx, x - 140, y - 330, 280, 130, 14); ctx.fillStyle = '#2B2622'; ctx.fill(); ctx.stroke();
+    // 반짝이는 테두리 전구
+    for (let i = 0; i < 18; i++) { const on = Math.sin(t * 4 + i) > 0; ctx.fillStyle = on ? '#FFD54A' : 'rgba(255,213,74,.25)'; ctx.beginPath(); ctx.arc(x - 128 + i * 15, y - 322, 3, 0, Math.PI * 2); ctx.fill(); }
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff'; ctx.font = '18px Jua'; ctx.fillText('도둑냥 오락실 · 모두의 점수', x, y - 296);
+    ctx.fillStyle = '#FFD54A'; ctx.font = '40px Jua';
+    ctx.fillText(everyone ? Number(everyone.total).toLocaleString('ko-KR') : '-', x, y - 254);
+    ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.font = '14px Jua';
+    ctx.fillText(everyone ? `오늘 +${Number(everyone.today).toLocaleString('ko-KR')} · 점수만큼 보호소로` : '점수만큼 보호소로 보낼 거야', x, y - 228);
+    if (given) { ctx.fillStyle = '#7BC67E'; ctx.fillText(`내가 보탠 점수 +${given.toLocaleString('ko-KR')}`, x, y - 210); }
+  }
+
+  // 게임 창 열기/닫기
+  const gameBox = document.getElementById('gameBox'), gameFrame = document.getElementById('gameFrame');
   const arcadeBtn = document.getElementById('arcadeBtn');
-  arcadeBtn.onclick = () => { gameEl.classList.add('open'); startRun(); };
+  let openGame = null;
+  function openArcade(gm) {
+    openGame = gm;
+    document.getElementById('gameTitle').textContent = gm.name;
+    document.getElementById('gameGive').textContent = '';
+    gameFrame.src = gm.url;
+    gameBox.classList.add('open'); window.plazaPaused = true;
+    speech.set(myId, { text: `${gm.name} 하러 감`, until: Date.now() + 2500 });
+  }
+  function closeArcade() {
+    gameBox.classList.remove('open'); window.plazaPaused = false;
+    gameFrame.src = 'about:blank';   // 게임 화면이 닫히면서 남은 점수를 보냄 (pagehide)
+    openGame = null; loadTotal();
+  }
+  arcadeBtn.onclick = () => { const gm = nearGame(); if (gm) openArcade(gm); };
+  document.getElementById('gameClose').onclick = closeArcade;
+  addEventListener('message', (e) => {
+    const d = e.data;
+    if (!d || d.type !== 'doduk-score' || !(d.score > 0)) return;
+    given += d.score;
+    if (everyone) { everyone = { ...everyone, total: Number(everyone.total) + d.score, today: Number(everyone.today) + d.score }; }
+    document.getElementById('gameGive').textContent = `+${given.toLocaleString('ko-KR')} 보탬`;
+    setTimeout(loadTotal, 1500);
+  });
 
   // =====================================================================
   // 크리스마스 트리: 들어온 사람마다 장식 하나씩 (하루 3개까지)
@@ -305,12 +210,6 @@
 
   // ---------- 홍보 영상(film.js)용 손잡이: ?film 일 때만 ----------
   if (film) window.filmExtras = {
-    arcade: {
-      reset: () => { lsSet(`doduk-jump-${kstDate()}`, []); board = []; },
-      start: () => { gameEl.classList.add('open'); startRun(); },
-      jump, run: () => run, PX, cv: gcv,
-      tick: (now) => { if (run && !run.over) tick(now); },
-    },
     tree: {
       reset: () => { orns = []; lsSet(todayKey(), 0); },
       open: () => { renderTreeBox(); treeEl.classList.add('open'); },
@@ -324,14 +223,16 @@
 
   // ---------- 광장에 그리기 + 버튼 표시 ----------
   plazaHooks.push((items, t) => {
-    items.push({ y: ARCADE.y, draw: () => drawArcade(t) });
+    items.push({ y: BOARD.y - 150, draw: () => drawBoard(t) });   // 전광판은 게임기 뒤
+    for (const gm of GAMES) items.push({ y: gm.y, draw: () => drawCabinet(gm, t) });
     if (treeOn()) items.push({ y: TREE.y + 20, draw: () => drawPlazaTree(t) });
   });
   frameHooks.push(() => {
-    const a = nearArcade() && still() && !gameEl.classList.contains('open');
+    const gm = nearGame(), a = !!gm && still() && !openGame;
+    if (a) { const label = `${gm.name} 하기`; if (arcadeBtn.textContent !== label) arcadeBtn.textContent = label; }
     if (a !== arcadeBtn.classList.contains('show')) arcadeBtn.classList.toggle('show', a);
     const tr = nearTree() && still() && !treeEl.classList.contains('open');
     if (tr !== treeBtn.classList.contains('show')) treeBtn.classList.toggle('show', tr);
-    if (!isPlaza()) { if (gameEl.classList.contains('open')) document.getElementById('jumpClose').click(); treeEl.classList.remove('open'); }
+    if (!isPlaza()) treeEl.classList.remove('open');
   });
 })();
