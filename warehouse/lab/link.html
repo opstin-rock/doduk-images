@@ -61,6 +61,7 @@
   .toast { width:max-content; max-width:88vw; text-align:center; line-height:1.35; }
   .rules { text-align:left; padding:18px 16px 0; }
   .rules h2 { text-align:center; font-size:24px; }
+  .embed .back { display:none; }
   .back { display:inline-block; font-size:13px; color:var(--muted); text-decoration:none; margin-bottom:4px; }
   .rules ol { margin:0 0 6px; padding-left:20px; font-size:14px; line-height:1.6; }
   .rules li { margin-bottom:5px; }
@@ -144,7 +145,8 @@
 <script src="../pets.js?v=26"></script>
 <script src="haptic.js?v=1"></script>
 <script src="../config.js?v=26"></script>
-<script src="score.js?v=1"></script>
+<script src="score.js?v=2"></script>
+<script>if (location.search.includes('embed')) document.documentElement.classList.add('embed');</script>
 <script>
 (() => {
   // ---------- 설정 ----------
