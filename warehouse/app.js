@@ -69,7 +69,7 @@ function hourPick(room) {
   return arr.slice(0, PER_ROOM);
 }
 function sceneInfo() {
-  if (isPlaza()) return { title: '도둑냥 광장', items: [], shelves: [] };
+  if (isPlaza()) return { title: '도둑냥 오락실', items: [], shelves: [] };
   if (!data) return { title: '', items: [], shelves: ROOM_SHELVES };
   if (me.scene === 'field') return { title: '운동장', items: [], shelves: [], field: true };
   if (me.scene === 'dance') return { title: '댄스장', items: [], shelves: [], dance: true };
@@ -80,12 +80,8 @@ function sceneInfo() {
 }
 // 광장의 문들 (방 id, 이름, 위치)
 function doors() {
-  const list = [{ id: 'deal', title: '오늘의 타임딜', x: DEAL_DOOR.x, y: DEAL_DOOR.y, side: 'top' }];
-  // 강아지·고양이 카테고리 방 문은 2026-11-04에 뺌 (광장은 노는 곳 + 타임딜 방 + 포토존)
-  list.push({ id: 'photo', title: '도둑냥 포토존', side: 'left', x: 30, y: 900 });
-  list.push({ id: 'dance', title: '도둑냥 댄스장', side: 'right', x: PLAZA.w - 30, y: 900 });
-  list.push({ id: 'field', title: '도둑냥 운동장', side: 'right', x: PLAZA.w - 30, y: 480 });
-  return list;
+  // 2026-11-09 광장을 통째로 오락실로 바꾸면서 타임딜·포토존·댄스장·운동장 문을 모두 뺌 (방 코드는 남아 있지만 갈 수 없음)
+  return [];
 }
 
 // ---------- 다른 손님 (실시간, 같은 장소에 있는 손님만) ----------
@@ -120,7 +116,7 @@ function onMove(m) {
 }
 
 // ---------- 말풍선: 정해진 문구만 (번호만 주고받아서 다른 글이 끼어들 수 없음) ----------
-const PHRASES = ['(울음)', '이거 싸다', '득템했다', '어디 있어?', '같이 놀자', '같이 구경하자', '안녕', '배고파', '산책 가자', '다음 방 가자', '고마워', '잘 가'];
+const PHRASES = ['(울음)', '한 판 하자', '내가 이겼다', '어디 있어?', '같이 놀자', '같이 하자', '안녕', '배고파', '콤보 터졌다', '다음 게임 가자', '고마워', '잘 가'];
 const speech = new Map();   // id → { text, until }
 function phraseText(i, breed) {
   if (i === 0) return BREEDS[breed].kind === 'cat' ? '냥' : '멍멍';
@@ -419,49 +415,43 @@ function drawWallAndFloor(w, h, floor, title, sub) {
   if (sub) { ctx.font = '18px "Noto Sans KR"'; ctx.fillStyle = '#fff'; ctx.fillText(sub, sx, 160); }
 }
 
+// ---------- 광장 = 도둑냥 오락실 (2026-11-09) ----------
+// 바닥: 오락실 카펫 (어두운 남색 + 형광 무늬). 처음 한 번만 그려 두고 복사해서 씀
+const NEON = ['#FF5DA2', '#3EE6C8', '#FFD54A', '#7C8CFF', '#FF8A3D'];
+let carpet = null;
+function carpetCanvas() {
+  if (carpet) return carpet;
+  const c = document.createElement('canvas'); c.width = PLAZA.w; c.height = PLAZA.h - 190;
+  const g = c.getContext('2d');
+  g.fillStyle = '#2A2350'; g.fillRect(0, 0, c.width, c.height);
+  let s = 7; const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+  g.lineWidth = 4; g.lineCap = 'round'; g.lineJoin = 'round';
+  for (let i = 0; i < 320; i++) {
+    const x = rnd() * c.width, y = rnd() * c.height, k = rnd(), col = NEON[i % NEON.length];
+    g.globalAlpha = 0.45; g.strokeStyle = col; g.fillStyle = col;
+    if (k < 0.28) { g.beginPath(); g.arc(x, y, 6 + rnd() * 6, 0, Math.PI * 2); g.stroke(); }
+    else if (k < 0.52) { g.beginPath(); g.moveTo(x, y - 9); g.lineTo(x + 9, y + 7); g.lineTo(x - 9, y + 7); g.closePath(); g.stroke(); }
+    else if (k < 0.8) { g.beginPath(); g.moveTo(x - 14, y); for (let j = 1; j <= 4; j++) g.lineTo(x - 14 + j * 7, y + (j % 2 ? -6 : 6)); g.stroke(); }
+    else { g.fillRect(x - 3, y - 3, 6, 6); }
+  }
+  g.globalAlpha = 1;
+  return (carpet = c);
+}
 function drawPlaza(t) {
   const { w, h } = PLAZA;
-  drawWallAndFloor(w, h, '#E9DCC4', '도둑냥 광장', '');
-  // 잔디밭
-  ctx.fillStyle = '#B9D99A';
-  for (const [x, y, rx, ry] of [[300, 620, 170, 90], [1140, 620, 170, 90], [300, 1350, 180, 95], [1140, 1350, 180, 95]]) {
-    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#94BE73'; ctx.lineWidth = 3; ctx.stroke();
-  }
-  // 분수
-  const f = FOUNTAIN;
-  ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.ellipse(f.x, f.y + 18, f.r + 10, f.r * 0.55, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#CFC3B0'; ctx.beginPath(); ctx.ellipse(f.x, f.y, f.r, f.r * 0.55, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3; ctx.stroke();
-  ctx.fillStyle = '#8FC9E8'; ctx.beginPath(); ctx.ellipse(f.x, f.y - 4, f.r - 18, f.r * 0.42, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2;
-  for (let i = 0; i < 3; i++) { const k = ((t * 0.5 + i / 3) % 1); ctx.beginPath(); ctx.ellipse(f.x, f.y - 4, 20 + k * 70, (20 + k * 70) * 0.42, 0, 0, Math.PI * 2); ctx.globalAlpha = 1 - k; ctx.stroke(); }
+  ctx.fillStyle = '#15112b'; ctx.fillRect(-2000, -2000, w + 4000, h + 4000);
+  ctx.drawImage(carpetCanvas(), 0, 190);
+  // 벽: 어두운 벽 + 깜빡이는 형광 띠와 전구
+  ctx.fillStyle = '#1B1638'; ctx.fillRect(0, 0, w, 190);
+  for (let i = 0; i < 5; i++) { ctx.fillStyle = NEON[(i + Math.floor(t * 2)) % NEON.length]; ctx.globalAlpha = 0.85; ctx.fillRect(i * (w / 5), 178, w / 5, 8); }
   ctx.globalAlpha = 1;
-  ctx.fillStyle = '#CFC3B0'; rr(f.x - 14, f.y - 70, 28, 66, 8); ctx.fill(); ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3; ctx.stroke();
-  ctx.fillStyle = '#8FC9E8';
-  for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + t; ctx.beginPath(); ctx.arc(f.x + Math.cos(a) * 26, f.y - 76 + Math.sin(t * 4 + i) * 6, 4, 0, Math.PI * 2); ctx.fill(); }
-  // 벤치
-  for (const [x, y] of [[470, 1150], [970, 1150], [470, 560], [970, 560]]) {
-    rr(x - 70, y - 14, 140, 22, 6); ctx.fillStyle = '#B07A4A'; ctx.fill(); ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 2.5; ctx.stroke();
-    rr(x - 70, y - 40, 140, 16, 6); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#6B4A30'; ctx.fillRect(x - 60, y + 8, 8, 18); ctx.fillRect(x + 52, y + 8, 8, 18);
-  }
-  // 위쪽 문: 오늘의 타임딜
-  const d = DEAL_DOOR;
-  rr(d.x - 105, 92, 210, 112, 12); ctx.fillStyle = '#E8402F'; ctx.fill(); ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3; ctx.stroke();
-  ctx.fillStyle = '#FFD54A'; ctx.font = '26px Jua'; ctx.textAlign = 'center'; ctx.fillText('오늘의 타임딜', d.x, 140);
-  ctx.fillStyle = '#fff'; ctx.font = '17px Jua'; ctx.fillText('▲ 들어가기', d.x, 182);
-  // 양옆 문
-  for (const dr of doors()) {
-    if (dr.side === 'top') continue;
-    const left = dr.side === 'left';
-    rr(left ? 0 : PLAZA.w - 30, dr.y - 60, 30, 120, 6); ctx.fillStyle = left ? '#7B9E6B' : '#C57B88'; ctx.fill();
-    const [a, b] = dr.title.split(' ');
-    const bw = 96, bx = left ? 38 : PLAZA.w - 38 - bw;
-    rr(bx, dr.y - 34, bw, 64, 10); ctx.fillStyle = 'rgba(255,255,255,.94)'; ctx.fill();
-    ctx.fillStyle = '#1f1f22'; ctx.font = '21px Jua'; ctx.textAlign = 'center';
-    ctx.fillText(a, bx + bw / 2, dr.y - 8); ctx.fillText(b, bx + bw / 2, dr.y + 20);
-  }
+  for (let x = 30; x < w; x += 60) { const on = Math.sin(t * 3 + x * 0.05) > 0; ctx.fillStyle = on ? '#FFD54A' : 'rgba(255,213,74,.2)'; ctx.beginPath(); ctx.arc(x, 150, 5, 0, Math.PI * 2); ctx.fill(); }
+  // 간판
+  ctx.textAlign = 'center'; ctx.font = '38px Jua';
+  const title = '도둑냥 오락실', tw = ctx.measureText(title).width + 70;
+  rr(w / 2 - tw / 2, 20, tw, 70, 16); ctx.fillStyle = '#2B2622'; ctx.fill();
+  ctx.strokeStyle = NEON[Math.floor(t * 1.5) % NEON.length]; ctx.lineWidth = 4; ctx.stroke();
+  ctx.save(); ctx.shadowColor = '#FFD54A'; ctx.shadowBlur = 14; ctx.fillStyle = '#FFD54A'; ctx.fillText(title, w / 2, 70); ctx.restore();
   label('입구', ENTRY.x, h - 60, '#C0563E', '#fff', '20px Jua');
 }
 
@@ -503,7 +493,7 @@ function drawBooth(t) {
   rr(c.x - 80, c.y - 28, 160, 52, 10); ctx.fillStyle = '#6B4A30'; ctx.fill();
   rr(c.x - 80, c.y - 28, 160, 14, 10); ctx.fillStyle = '#8A6343'; ctx.fill();
   if (!bot.home || (bot.say && Date.now() < bot.say.until)) return;   // 도둑냥이 청소하러 나가면 부스는 비어 있음
-  const lines = ['어서 와, 여긴 놀고 가는 광장이야', '위쪽 빨간 문은 오늘의 타임딜', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '왼쪽 문은 포토존, 소품 쓰고 네컷 찍어 가', '오른쪽 문은 댄스장, 들어가면 다 같이 춤춰', '오른쪽 위 문은 운동장, 공 차러 가자', '오른쪽 아래 천막은 점집, 오늘의 카드 뽑아 봐', '매시 정각엔 간식 타임, 1분 동안 많이 주워', '왼쪽 아래 오락실에서 점프왕 도전해 봐', '오른쪽 위 트리에 장식 하나 달아 줘', '구경은 공짜, 살 때만 로그인'];
+  const lines = ['어서 와, 여긴 도둑냥 오락실이야', '게임기 앞에 서면 바로 할 수 있어', '다 같이 모은 점수만큼 보호소로 보낼 거야', '위 전광판이 모두의 점수야', '매시 정각엔 간식 타임, 1분 동안 많이 주워', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '불 꺼진 게임기는 지금 만드는 중'];
   const msg = lines[Math.floor(t / 4) % lines.length];
   ctx.font = '18px Jua'; const w = ctx.measureText(msg).width + 24;
   const bx = c.x + 30, by = c.y - 172;
@@ -1432,8 +1422,7 @@ function frame(now) {
   const items = info.shelves.map((s, i) => ({ y: s.y + 60, draw: () => drawShelf(s, info.items[i]) }));
   if (info.field) items.push({ y: ball.y, draw: drawBall });
   if (isPlaza() && !LINEUP) {
-    items.push({ y: BOOTH.y + 24, draw: () => drawBooth(t) });
-    items.push({ y: TENT.y, draw: () => drawTent(t) });
+    items.push({ y: BOOTH.y + 24, draw: () => drawBooth(t) });   // 점집 천막은 오락실로 바꾸면서 뺌
     const sc = snackClock();
     if (sc.active && sc.round === snack.round) for (const s of visibleSnacks(sc.into)) items.push({ y: s.y - 2, draw: () => drawSnack(s, sc.into) });
     for (const h of plazaHooks) h(items, t, now);
@@ -1471,7 +1460,7 @@ function frame(now) {
   if (!info.photo && boothEl.classList.contains('open')) boothEl.classList.remove('open');
   const canSnap = !!info.photo && !booth.busy && inSpot(me) && Math.hypot(me.tx - me.x, me.ty - me.y) < 2;
   if (canSnap !== snapBtn.classList.contains('show')) snapBtn.classList.toggle('show', canSnap);
-  const canTarot = nearTent() && Math.hypot(me.tx - me.x, me.ty - me.y) < 2;
+  const canTarot = false;   // 점집 없음
   if (canTarot !== tarotBtn.classList.contains('show')) tarotBtn.classList.toggle('show', canTarot);
   if (!isPlaza() && tarotEl.classList.contains('open')) tarotEl.classList.remove('open');
   for (const h of frameHooks) h(now);
