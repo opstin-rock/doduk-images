@@ -1402,6 +1402,8 @@ function step(p, dt) {
 
 let lastT = performance.now();
 function frame(now) {
+  // 오락실 게임 창이 열려 있으면 광장은 쉬게 함 (폰에서 둘 다 그리면 느려짐)
+  if (window.plazaPaused) { lastT = now; requestAnimationFrame(frame); return; }
   const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
   const t = now / 1000;
   step(me, dt);
