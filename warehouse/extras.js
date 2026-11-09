@@ -20,13 +20,17 @@
   // 게임에서 점수를 보내면 postMessage로 알려 줘서 전광판 숫자를 바로 올림
   // =====================================================================
   const GAMES = [
-    { id: 'sacheon', name: '사천성', x: 228, y: 1190, url: 'lab/link.html?embed=1&v=12', body: '#E8402F', screen: 'sacheon' },
-    { id: 'peaks', name: '트라이피크', x: 348, y: 1190, url: 'lab/peaks.html?embed=1&v=7', body: '#3D7BD9', screen: 'peaks' },
+    // 광장 전체가 오락실 (2026-11-09). 앞줄: 지금 할 수 있는 게임, 뒷줄: 만드는 중 (불 꺼진 게임기)
+    { id: 'sacheon', name: '사천성', x: 560, y: 900, url: 'lab/link.html?embed=1&v=12', body: '#E8402F', screen: 'sacheon' },
+    { id: 'peaks', name: '트라이피크', x: 720, y: 900, url: 'lab/peaks.html?embed=1&v=7', body: '#3D7BD9', screen: 'peaks' },
+    { id: 'match3', name: '간식 3매치', x: 880, y: 900, soon: true, body: '#8C7FA8' },
+    { id: 'merge', name: '간식 합치기', x: 400, y: 1230, soon: true, body: '#8C7FA8' },
+    { id: 'pair', name: '우리 애 짝 맞추기', x: 1040, y: 1230, soon: true, body: '#8C7FA8' },
   ];
-  const BOARD = { x: 288, y: 1190 };   // 왼쪽 벽 포토존 간판(~x135)과 오른쪽 벤치(~x400) 사이
+  const BOARD = { x: 720, y: 640, w: 440 };   // 모두의 점수 전광판 (위쪽 가운데)
   const nearGame = () => {
     if (!isPlaza()) return null;
-    let best = null, bd = 80;
+    let best = null, bd = 62;
     for (const gm of GAMES) { const d = Math.abs(me.x - gm.x); if (d < bd && me.y > gm.y - 10 && me.y < gm.y + 110) { bd = d; best = gm; } }
     return best;
   };
@@ -40,8 +44,12 @@
     ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3;
     R(ctx, x - 44, y - 140, 88, 140, 12); ctx.fillStyle = gm.body; ctx.fill(); ctx.stroke();
     R(ctx, x - 34, y - 128, 68, 54, 6); ctx.fillStyle = '#1E2233'; ctx.fill(); ctx.stroke();
-    // 화면 속 작은 그림
-    if (gm.screen === 'sacheon') {
+    // 화면 속 작은 그림 (만드는 중이면 꺼진 화면 + 테이프)
+    if (gm.soon) {
+      ctx.fillStyle = '#888'; ctx.font = '13px Jua'; ctx.textAlign = 'center'; ctx.fillText('만드는 중', x, y - 96);
+      ctx.save(); ctx.translate(x, y - 100); ctx.rotate(-0.25); ctx.fillStyle = 'rgba(255,213,74,.85)'; ctx.fillRect(-46, -7, 92, 14);
+      ctx.fillStyle = '#2a2420'; ctx.font = '10px Jua'; ctx.fillText('곧 열려', 0, 4); ctx.restore();
+    } else if (gm.screen === 'sacheon') {
       const cols = ['#FFE3C2', '#E6F4FF', '#FDE4EC', '#DDF2E3'];
       for (let i = 0; i < 6; i++) { const cx = x - 27 + (i % 3) * 19, cy = y - 121 + Math.floor(i / 3) * 22; ctx.fillStyle = cols[(i + Math.floor(t * 2)) % 4]; ctx.fillRect(cx, cy, 15, 18); }
       ctx.strokeStyle = '#E8402F'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 20, y - 103); ctx.lineTo(x - 20, y - 78); ctx.lineTo(x + 18, y - 78); ctx.lineTo(x + 18, y - 81); ctx.stroke();
@@ -60,21 +68,26 @@
     R(ctx, x - w / 2, y + 10, w, 26, 8); ctx.fillStyle = '#2B2622'; ctx.fill();
     ctx.fillStyle = '#FFD54A'; ctx.fillText(gm.name, x, y + 28);
   }
+  // 전광판: 다리 달린 큰 화면. y는 다리 밑동, 화면은 그 위 (높이 190)
   function drawBoard(t) {
-    const { x, y } = BOARD;
+    const { x, y, w } = BOARD, top = y - 300, hgt = 190;
     ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3;
-    ctx.fillStyle = '#5B4636'; ctx.fillRect(x - 128, y - 300, 8, 150); ctx.fillRect(x + 120, y - 300, 8, 150);   // 기둥
-    R(ctx, x - 140, y - 330, 280, 130, 14); ctx.fillStyle = '#2B2622'; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#3A3550'; ctx.fillRect(x - w / 2 + 30, top + hgt - 4, 12, y - top - hgt + 4); ctx.fillRect(x + w / 2 - 42, top + hgt - 4, 12, y - top - hgt + 4);   // 다리
+    ctx.save(); ctx.shadowColor = NEON_PINK; ctx.shadowBlur = 18;
+    R(ctx, x - w / 2, top, w, hgt, 16); ctx.fillStyle = '#16122E'; ctx.fill(); ctx.restore();
+    ctx.strokeStyle = '#FF5DA2'; ctx.lineWidth = 4; R(ctx, x - w / 2, top, w, hgt, 16); ctx.stroke();
     // 반짝이는 테두리 전구
-    for (let i = 0; i < 18; i++) { const on = Math.sin(t * 4 + i) > 0; ctx.fillStyle = on ? '#FFD54A' : 'rgba(255,213,74,.25)'; ctx.beginPath(); ctx.arc(x - 128 + i * 15, y - 322, 3, 0, Math.PI * 2); ctx.fill(); }
+    const n = Math.floor(w / 16);
+    for (let i = 0; i < n; i++) { const on = Math.sin(t * 5 + i) > 0; ctx.fillStyle = on ? '#FFD54A' : 'rgba(255,213,74,.25)'; ctx.beginPath(); ctx.arc(x - w / 2 + 14 + i * ((w - 28) / (n - 1)), top + 12, 3.5, 0, Math.PI * 2); ctx.fill(); }
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#fff'; ctx.font = '18px Jua'; ctx.fillText('도둑냥 오락실 · 모두의 점수', x, y - 296);
-    ctx.fillStyle = '#FFD54A'; ctx.font = '40px Jua';
-    ctx.fillText(everyone ? Number(everyone.total).toLocaleString('ko-KR') : '-', x, y - 254);
-    ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.font = '14px Jua';
-    ctx.fillText(everyone ? `오늘 +${Number(everyone.today).toLocaleString('ko-KR')} · 점수만큼 보호소로` : '점수만큼 보호소로 보낼 거야', x, y - 228);
-    if (given) { ctx.fillStyle = '#7BC67E'; ctx.fillText(`내가 보탠 점수 +${given.toLocaleString('ko-KR')}`, x, y - 210); }
+    ctx.fillStyle = '#fff'; ctx.font = '22px Jua'; ctx.fillText('모두의 점수', x, top + 46);
+    ctx.save(); ctx.shadowColor = '#FFD54A'; ctx.shadowBlur = 12; ctx.fillStyle = '#FFD54A'; ctx.font = '58px Jua';
+    ctx.fillText(everyone ? Number(everyone.total).toLocaleString('ko-KR') : '-', x, top + 110); ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = '17px Jua';
+    ctx.fillText(everyone ? `오늘 +${Number(everyone.today).toLocaleString('ko-KR')} · 모은 만큼 보호소로 보낼 거야` : '모은 만큼 보호소로 보낼 거야', x, top + 142);
+    if (given) { ctx.fillStyle = '#7BC67E'; ctx.fillText(`내가 보탠 점수 +${given.toLocaleString('ko-KR')}`, x, top + 170); }
   }
+  const NEON_PINK = '#FF5DA2';
 
   // 게임 창 열기/닫기
   const gameBox = document.getElementById('gameBox'), gameFrame = document.getElementById('gameFrame');
@@ -93,7 +106,11 @@
     gameFrame.src = 'about:blank';   // 게임 화면이 닫히면서 남은 점수를 보냄 (pagehide)
     openGame = null; loadTotal();
   }
-  arcadeBtn.onclick = () => { const gm = nearGame(); if (gm) openArcade(gm); };
+  arcadeBtn.onclick = () => {
+    const gm = nearGame(); if (!gm) return;
+    if (gm.soon) { speech.set(myId, { text: `${gm.name}은 아직 만드는 중이래`, until: Date.now() + 2500 }); return; }
+    openArcade(gm);
+  };
   document.getElementById('gameClose').onclick = closeArcade;
   addEventListener('message', (e) => {
     const d = e.data;
@@ -109,7 +126,7 @@
   // =====================================================================
   const TREE = { x: 1150, y: 700, w: 260, h: 330 };   // y는 트리 밑동
   const kstNow = () => new Date(Date.now() + 9 * 3600000);
-  const treeOn = () => { const d = kstNow(); return d.getUTCFullYear() === 2026 && (d.getUTCMonth() === 10 || d.getUTCMonth() === 11); };   // 11~12월
+  const treeOn = () => false;   // 2026-11-09 광장을 오락실로 바꾸면서 트리도 뺌 (코드는 남겨 둠)
   const nearTree = () => isPlaza() && treeOn() && Math.abs(me.x - TREE.x) < 150 && me.y > TREE.y - 20 && me.y < TREE.y + 110;
   let orns = [];
   async function loadOrns() {
@@ -229,7 +246,7 @@
   });
   frameHooks.push(() => {
     const gm = nearGame(), a = !!gm && still() && !openGame;
-    if (a) { const label = `${gm.name} 하기`; if (arcadeBtn.textContent !== label) arcadeBtn.textContent = label; }
+    if (a) { const label = gm.soon ? `${gm.name} · 준비 중` : `${gm.name} 하기`; if (arcadeBtn.textContent !== label) arcadeBtn.textContent = label; }
     if (a !== arcadeBtn.classList.contains('show')) arcadeBtn.classList.toggle('show', a);
     const tr = nearTree() && still() && !treeEl.classList.contains('open');
     if (tr !== treeBtn.classList.contains('show')) treeBtn.classList.toggle('show', tr);
