@@ -106,7 +106,7 @@
     <li><b>택배 상자</b>는 못 없애고 길을 막아. 돌아서 이어</li>
     <li>2.5초 안에 다음 짝을 찾으면 <b>연속 보너스</b></li>
   </ol>
-  <p class="muted">막히면 힌트·섞기를 써. 단계를 깨거나 시간이 끝나면 얻은 점수가 모두의 점수에 보태져</p>
+  <p class="muted">한 단계를 끝낼 때마다 보호소에 보낼 <b>사료 한 알</b>이 쌓여 (하루 20알까지, 300알 모이면 사료나 간식 1개를 보내). 막히면 힌트·섞기를 써</p>
   <button class="main" id="startBtn">시작</button>
 </div></div>
 
@@ -145,7 +145,7 @@
 <script src="../pets.js?v=26"></script>
 <script src="haptic.js?v=1"></script>
 <script src="../config.js?v=26"></script>
-<script src="score.js?v=2"></script>
+<script src="score.js?v=3"></script>
 <script>if (location.search.includes('embed')) document.documentElement.classList.add('embed');</script>
 <script>
 (() => {
@@ -304,6 +304,7 @@
     grid[a[0]][a[1]] = null; grid[b[0]][b[1]] = null;
     sel = null; hint = null;
     deadline += 1000;   // 짝 하나에 1초 추가
+    stagePairs++;
     if (!remaining()) return clearStage();
     const dir = stageInfo(stage).slide;
     if (dir) slide(dir, now);
@@ -333,14 +334,21 @@
     if (gain > 0) { sent = score; Score.send('sacheon', gain, { keepalive }); }
     return Math.max(0, gain);
   }
-  addEventListener('pagehide', () => sendGained(true));
+  addEventListener('pagehide', () => { sendGained(true); kibbleIfPlayed(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) sendGained(true); });
+  // 사료 한 알: 한 단계를 끝내면 (깨거나, 시간 끝·처음부터 전에 짝 5개 이상 없앴으면) 한 알. 단계마다 한 번만
+  let stagePairs = 0, kibbleDone = false;
+  function giveKibble() { if (kibbleDone) return Promise.resolve(undefined); kibbleDone = true; return Score.kibble('sacheon'); }
+  function kibbleIfPlayed() { return running && stagePairs >= 5 ? giveKibble() : Promise.resolve(undefined); }
+  const kibbleText = (r) => r === undefined ? '짝 5개 이상 없애면 한 알' : r && r.ok ? `+1 (오늘 ${r.today}/20)` : r && r.reason === 'cap' ? '오늘 20알 다 모았어' : '나중에 다시 보낼게';
+  function showKibble(id, promise) { promise.then((r) => { const el = document.getElementById(id); if (el) el.textContent = kibbleText(r); }); }
   function clearStage() {
     running = false;
     const left = Math.max(0, Math.ceil((deadline - performance.now()) / 1000));
     const bonus = left * 5;
     score += bonus;
     const given = sendGained();
+    const kib = giveKibble();
     confetti(performance.now()); Haptic.big();
     hintsLeft = Math.min(5, hintsLeft + 1); shufflesLeft = Math.min(3, shufflesLeft + 1);
     updateHud();
@@ -350,27 +358,32 @@
       document.getElementById('clearDetail').innerHTML =
         `<div><span>남은 시간 ${left}초 × 5</span><b>+${bonus}</b></div>` +
         `<div class="total"><span>지금까지 점수</span><b>${score}점</b></div>` +
-        `<div><span>모두의 점수에 보탬</span><b>+${Score.fmt(given)}</b></div>`;
+        `<div><span>모두의 점수에 보탬</span><b>+${Score.fmt(given)}</b></div>` +
+        `<div><span>보호소에 보낼 사료 한 알</span><b id="kibClear">보내는 중</b></div>`;
+      showKibble('kibClear', kib);
       document.getElementById('clearNext').innerHTML =
         `다음은 <b>${stage + 1}단계</b><br>${stageLabel(next)} · ${next.time}초<br>힌트·섞기 하나씩 더 줄게`;
       document.getElementById('clearBox').classList.add('open');
     }, 500);
   }
   function timeUp() {
+    const kib = kibbleIfPlayed();   // running이 꺼지기 전에 확인
     running = false; sel = null; hint = null; updateHud();
     const best = bestScore();
     document.getElementById('endScore').textContent = `${score}점`;
     document.getElementById('endDetail').textContent = `${stage}단계까지 왔어`;   // 짧아서 한 줄
     document.getElementById('endBest').textContent = score > best ? '내 최고 기록' : `내 최고 기록 ${best}점`;
     const given = sendGained();
-    showEveryone(document.getElementById('endEveryone'), given);
+    showEveryone(document.getElementById('endEveryone'), given, kib);
     document.getElementById('endBox').classList.add('open');
   }
-  // 결과창 아래 "모두의 점수" (합계는 서버에서 읽어 옴, 못 읽으면 내가 보탠 것만)
-  function showEveryone(el, given) {
-    el.innerHTML = `<div><span>이번에 모두의 점수에 보탬</span><b>+${Score.fmt(given)}</b></div>` +
+  // 결과창 아래 "모두의 점수" (합계는 서버에서 읽어 옴, 못 읽으면 내가 보탠 것만) + 사료 한 알
+  function showEveryone(el, given, kib) {
+    el.innerHTML = `<div><span>보호소에 보낼 사료 한 알</span><b id="${el.id}Kib">보내는 중</b></div>` +
+      `<div><span>이번에 모두의 점수에 보탬</span><b>+${Score.fmt(given)}</b></div>` +
       `<div><span>내가 지금까지 보탠 점수</span><b>${Score.fmt(Score.mine())}</b></div>` +
       `<div class="total"><span>모두의 점수</span><b id="${el.id}Total">불러오는 중</b></div>`;
+    showKibble(`${el.id}Kib`, kib || Promise.resolve(undefined));
     setTimeout(async () => {
       const t = await Score.total();
       const b = document.getElementById(`${el.id}Total`);
@@ -388,7 +401,7 @@
     if (!running || shufflesLeft <= 0) return;
     reshuffle(); shufflesLeft--; sel = null; hint = null; toast('섞었어'); updateHud();
   };
-  document.getElementById('restartBtn').onclick = () => { sendGained(); start(); };
+  document.getElementById('restartBtn').onclick = () => { sendGained(); kibbleIfPlayed(); start(); };
   const vibeBtn = document.getElementById('vibeBtn');
   const vibeLabel = () => { vibeBtn.textContent = Haptic.on ? '진동 켬' : '진동 끔'; vibeBtn.classList.toggle('off', !Haptic.on); };
   vibeBtn.onclick = () => { Haptic.toggle(); vibeLabel(); toast(Haptic.on ? '진동 켰어' : '진동 껐어'); };
@@ -403,7 +416,7 @@
   }
   function startStage() {
     newGrid(); sel = null; hint = null; pathFx = null; pops = []; moving = [];
-    combo = 0; lastMatch = -1e9;
+    combo = 0; lastMatch = -1e9; stagePairs = 0; kibbleDone = false;
     const info = stageInfo(stage);
     deadline = performance.now() + info.time * 1000; pausedLeft = null;
     running = true; updateHud(); tickTime();
