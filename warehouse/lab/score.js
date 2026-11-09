@@ -50,6 +50,40 @@ window.Score = (() => {
   const byGame = async () => { const j = await get('game_score?select=game,total,plays'); return j ? Object.fromEntries(j.map((x) => [x.game, x])) : null; };
   const mine = () => lsGet(MINE, 0);
   const fmt = (n) => Number(n).toLocaleString('ko-KR');
-  flush();
-  return { send, flush, total, byGame, mine, fmt };
+
+  // ---------- 사료알: 게임 한 판 끝내면 한 알 (폰 하나당 하루 20알, 서버 add_kibble 함수가 확인) ----------
+  // 폰마다 무작위 번호 하나 (누구인지 알 수 없음. 하루 상한 세는 데만 씀)
+  let device = lsGet('doduk-device', null);
+  if (!device) { device = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`).replace(/-/g, '').slice(0, 32); lsSet('doduk-device', device); }
+  // 팀: 광장에서 고른 강아지/고양이 (게임 주소 ?team=dog|cat 으로 넘어옴), 없으면 전에 쓴 팀
+  const urlTeam = new URLSearchParams(location.search).get('team');
+  let team = urlTeam === 'dog' || urlTeam === 'cat' ? urlTeam : lsGet('doduk-team', null);
+  if (team !== 'dog' && team !== 'cat') team = Math.random() < 0.5 ? 'dog' : 'cat';
+  lsSet('doduk-team', team);
+  const KPEND = 'doduk-pending-kibbles';
+  async function rpcKibble(game) {
+    if (!ready) return null;
+    try {
+      const r = await fetch(`${url}/rest/v1/rpc/add_kibble`, { method: 'POST', headers, body: JSON.stringify({ p_game: game, p_team: team, p_device: device }) });
+      return r.ok ? await r.json() : null;
+    } catch { return null; }
+  }
+  // 결과: { ok: true, today } / { ok: false, reason: 'cap' } / null(못 보냄 → 이 폰에 모아 뒀다가 다시)
+  async function kibble(game) {
+    const res = await rpcKibble(game);
+    if (!res) lsSet(KPEND, [...lsGet(KPEND, []), { game, day: today() }]);
+    if (window.parent !== window && res && res.ok) { try { window.parent.postMessage({ type: 'doduk-kibble', game, team, today: res.today }, '*'); } catch {} }
+    return res;
+  }
+  async function flushKibbles() {
+    const list = lsGet(KPEND, []).filter((p) => p.day === today());
+    const left = [];
+    for (const p of list) { const r = await rpcKibble(p.game); if (!r) left.push(p); }
+    lsSet(KPEND, left);
+  }
+  const progress = async () => { const j = await get('kibble_progress?select=total,sent,goal,current,today,today_dog,today_cat'); return j && j[0] ? j[0] : null; };
+  const shipments = async () => (await get('shipments?select=round,item,shelter,photo_url,sent_at&order=round.desc&limit=5')) || [];
+
+  flush(); flushKibbles();
+  return { send, flush, total, byGame, mine, fmt, kibble, progress, shipments, get team() { return team; } };
 })();
