@@ -84,6 +84,14 @@ window.Score = (() => {
   const progress = async () => { const j = await get('kibble_progress?select=total,sent,goal,current,today,today_dog,today_cat'); return j && j[0] ? j[0] : null; };
   const shipments = async () => (await get('shipments?select=round,item,shelter,photo_url,sent_at&order=round.desc&limit=5')) || [];
 
+  // 끝낸 게임 판 수 (옷장 소품 풀기용). 하루 20알 상한과 상관없이 끝낸 만큼 셈. 이 폰(브라우저)에 저장
+  function gameDone() {
+    const n = lsGet('doduk-games-done', 0) + 1;
+    lsSet('doduk-games-done', n);
+    if (window.parent !== window) { try { window.parent.postMessage({ type: 'doduk-game-done', n }, '*'); } catch {} }
+    return n;
+  }
+
   flush(); flushKibbles();
-  return { send, flush, total, byGame, mine, fmt, kibble, progress, shipments, get team() { return team; } };
+  return { send, flush, total, byGame, mine, fmt, kibble, progress, shipments, gameDone, gamesDone: () => lsGet('doduk-games-done', 0), get team() { return team; } };
 })();
