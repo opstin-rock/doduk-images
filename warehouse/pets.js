@@ -1,4 +1,4 @@
-// 도둑냥 창고 손님 캐릭터: 강아지 24종 + 고양이 22종
+// 도둑냥 창고 손님 캐릭터: 강아지 32종 + 고양이 26종 (토종개·믹스견·길고양이 포함)
 // 그림 파일 없이 코드로 그림. 품종마다 크기, 다리 길이, 몸통, 주둥이, 귀, 꼬리, 무늬, 표정 특징을 다르게 줌
 //   size 전체 크기 · legH/legW 다리 길이/굵기 · bodyW/bodyH 몸통 · headR 머리 · snout 주둥이 길이(0이면 납작한 얼굴)
 //   ear 귀 모양 · tail 꼬리 모양 · pattern 무늬 · 그 밖에 tongue(혀 내밀기), blush, topknot(머리 리본), brows(눈썹 점),
@@ -53,7 +53,23 @@ const BREEDS = [
   { name: '데본렉스', kind: 'cat', size: 0.9, base: '#B5A9A2', ear: 'huge', tail: 'thin', curly: true, eyeSize: 1.5, headR: 15 },
   { name: '아메리칸숏헤어', kind: 'cat', base: '#C3C7CB', spot: '#3F4248', belly: '#E9EBED', pattern: 'stripe', ear: 'point', tail: 'cat', eye: '#5DBB63' },
   { name: '아기 코숏', kind: 'cat', size: 0.6, base: '#F2B35B', spot: '#D9862B', pattern: 'stripe', ear: 'big', tail: 'cat', headR: 20, eyeSize: 1.6, blush: true },
+  // ---------- 11.10 추가: 토종개·믹스견·길고양이 (대표님). 번호가 바뀌지 않게 맨 뒤에 붙이고, 고르는 화면에서는 맨 앞에 보여 줌 ----------
+  { name: '백구 믹스', kind: 'dog', base: '#FFFDF6', ear: 'semi', tail: 'curl', snout: 8, blush: true },
+  { name: '누렁이 믹스', kind: 'dog', base: '#E0A85C', belly: '#F7DFB5', pattern: 'cheek', ear: 'semi', tail: 'curl', snout: 8 },
+  { name: '바둑이 믹스', kind: 'dog', size: 0.9, base: '#FFFFFF', spot: '#2E2A28', pattern: 'patch', ear: 'flop', earColor: '#2E2A28', tail: 'whip', snout: 7 },
+  { name: '깜장 믹스', kind: 'dog', base: '#2E2B2B', belly: '#F4EEE4', pattern: 'blaze', ear: 'semi', tail: 'plume', snout: 8, brows: '#C98A47' },
+  { name: '시고르자브종', kind: 'dog', size: 0.9, base: '#C7925A', belly: '#F3E2C6', pattern: 'blaze', ear: 'semi', tail: 'curl', snout: 7, tongue: true },
+  { name: '풍산개', kind: 'dog', size: 1.3, base: '#FBF8F1', ear: 'point', tail: 'curl', snout: 9, fluffy: true, mane: true },
+  { name: '삽살개', kind: 'dog', size: 1.1, base: '#D8C3A0', ear: 'flop', tail: 'plume', snout: 3, headR: 19, fluffy: true, curly: true, bangs: true },
+  { name: '동경이', kind: 'dog', base: '#D9A35E', belly: '#F6E5C8', pattern: 'cheek', ear: 'point', tail: 'stub', snout: 8 },
+  { name: '귀컷 길냥이', kind: 'cat', base: '#9C9184', spot: '#4E463E', belly: '#E8E2D8', pattern: 'stripe', ear: 'point', earTip: true, tail: 'cat', blush: true },
+  { name: '깜장 길냥이', kind: 'cat', base: '#2B2A2E', ear: 'point', tail: 'cat', eye: '#E8C547' },
+  { name: '회색 길냥이', kind: 'cat', base: '#A3A6AD', belly: '#F4F4F6', pattern: 'tux', ear: 'point', tail: 'cat', eye: '#7CC27F' },
+  { name: '꼬리짧은 길냥이', kind: 'cat', base: '#FFFFFF', spot: '#E8963A', spot2: '#3A3A3A', pattern: 'calico', ear: 'point', earTip: true, tail: 'kink' },
 ];
+// 고르는 화면에서 맨 앞에 보여 줄 아이들 (보호소에 많은 믹스·토종개·길고양이)
+const PICK_FIRST = ['백구 믹스', '누렁이 믹스', '바둑이 믹스', '깜장 믹스', '시고르자브종', '진돗개', '풍산개', '삽살개', '동경이',
+  '귀컷 길냥이', '깜장 길냥이', '회색 길냥이', '꼬리짧은 길냥이', '치즈 코숏', '고등어 코숏', '턱시도', '삼색이', '젖소냥', '아기 코숏'];
 
 const OUT = '#2a2420';
 
@@ -163,6 +179,7 @@ function drawTail(ctx, b, bodyW, bodyH, by, t, moving) {
     case 'plume': ctx.moveTo(x0, y0); ctx.quadraticCurveTo(x0 - 18, y0 - 18 + wag, x0 - 4, y0 - bodyH - 10 + wag); stroke(b.fluffy ? 11 : 8, col); break;
     case 'pompom': ctx.moveTo(x0, y0); ctx.lineTo(x0 - 8, y0 - 10 + wag); stroke(3, col);
       ctx.beginPath(); ctx.arc(x0 - 9, y0 - 13 + wag, 5.5, 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill(); ctx.stroke(); break;
+    case 'kink': ctx.moveTo(x0, y0); ctx.lineTo(x0 - 9, y0 - 7); ctx.lineTo(x0 - 5 + wag * 0.4, y0 - 16); stroke(5, col); break;   // 짧고 꺾인 꼬리 (길고양이)
     case 'stub': default: ctx.arc(x0 + 1, y0 + wag * 0.3, 4.5, 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill(); ctx.stroke();
   }
 }
@@ -203,6 +220,21 @@ function drawEar(ctx, b, hx, hy, headR, layer) {
         continue;
       }
       const tipX = cx + side * w * 0.35, tipY = hy - headR * 0.6 - h;
+      if (b.ear === 'semi') {   // 반쯤 접힌 귀: 끝이 얼굴 쪽 앞으로 톡 접힘 (믹스견·보더콜리·슈나우저)
+        const k = 0.66, l0 = [cx - w, hy - headR * 0.45], r0 = [cx + w, hy - headR * 0.55];
+        const L = [l0[0] + (tipX - l0[0]) * k, l0[1] + (tipY - l0[1]) * k], Rr = [r0[0] + (tipX - r0[0]) * k, r0[1] + (tipY - r0[1]) * k];
+        ctx.beginPath(); ctx.moveTo(...l0); ctx.lineTo(...L); ctx.lineTo(...Rr); ctx.lineTo(...r0); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(...L); ctx.lineTo(...Rr); ctx.lineTo((L[0] + Rr[0]) / 2 + w * 0.75, (L[1] + Rr[1]) / 2 + h * 0.32); ctx.closePath();
+        ctx.fillStyle = shade(col.startsWith('#') ? col : '#cccccc', 0.88); ctx.fill(); ctx.stroke();
+        continue;
+      }
+      if (b.earTip && side === 1) {   // 귀 끝이 살짝 잘린 귀 (중성화한 길고양이 표시)
+        const k = 0.7, l0 = [cx - w, hy - headR * 0.45], r0 = [cx + w, hy - headR * 0.55];
+        ctx.beginPath(); ctx.moveTo(...l0); ctx.lineTo(l0[0] + (tipX - l0[0]) * k, l0[1] + (tipY - l0[1]) * k);
+        ctx.lineTo(r0[0] + (tipX - r0[0]) * k, r0[1] + (tipY - r0[1]) * k); ctx.lineTo(...r0); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx - w * 0.45, hy - headR * 0.55); ctx.lineTo(tipX, tipY + h * 0.42); ctx.lineTo(cx + w * 0.45, hy - headR * 0.6); ctx.closePath(); ctx.fillStyle = '#F2A9A9'; ctx.fill();
+        continue;
+      }
       ctx.beginPath(); ctx.moveTo(cx - w, hy - headR * 0.45); ctx.lineTo(tipX, tipY);
       if (b.ear === 'semi') ctx.lineTo(tipX + side * 6, tipY + 7);
       ctx.lineTo(cx + w, hy - headR * 0.55); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.stroke();
@@ -285,6 +317,16 @@ function drawHead(ctx, b, hx, hy, headR, headCol, snout, t, seed) {
     ctx.beginPath(); ctx.arc(ex - r * 0.32, ey + r * 0.38, r * 0.17, 0, Math.PI * 2); ctx.fill();
   });
   if (b.brows) { ctx.fillStyle = b.brows; for (const [ex, ey] of eyes) { ctx.beginPath(); ctx.ellipse(ex, ey - es - 3.2, 2.6, 1.6, 0, 0, Math.PI * 2); ctx.fill(); } }
+  if (b.bangs) {   // 삽살개: 눈 위를 살짝 덮는 앞머리 (눈 아래쪽은 보이게)
+    const ey = eyes[0][1], y0 = ey - es * 1.05, xs = [0.78, 0.48, 0.18, -0.12, -0.42].map((v) => hx + v * headR);
+    ctx.save(); ctx.beginPath(); ctx.ellipse(hx, hy, headR - 1.2, headR * 0.93 - 1.2, 0, 0, Math.PI * 2); ctx.clip();
+    ctx.beginPath(); ctx.moveTo(hx - headR * 0.6, hy - headR); ctx.lineTo(hx + headR, hy - headR); ctx.lineTo(xs[0], y0 - 1);
+    for (let i = 0; i < 4; i++) ctx.quadraticCurveTo((xs[i] + xs[i + 1]) / 2, y0 + 4, xs[i + 1], y0 - 1);
+    ctx.lineTo(hx - headR * 0.6, y0 - 4); ctx.closePath(); ctx.fillStyle = shade(headCol, 0.97); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(xs[0], y0 - 1); for (let i = 0; i < 4; i++) ctx.quadraticCurveTo((xs[i] + xs[i + 1]) / 2, y0 + 4, xs[i + 1], y0 - 1);
+    ctx.strokeStyle = shade(headCol, 0.78); ctx.lineWidth = 1.4; ctx.stroke(); ctx.restore();
+    ctx.lineWidth = 2.4; ctx.strokeStyle = OUT;
+  }
   // 볼 터치 (모두)
   ctx.fillStyle = b.blush ? 'rgba(255,120,140,.5)' : 'rgba(255,130,150,.32)';
   ctx.beginPath(); ctx.ellipse(hx + headR * 0.6, hy + headR * 0.4, 4, 2.4, 0, 0, Math.PI * 2); ctx.fill();
