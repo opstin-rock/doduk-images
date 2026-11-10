@@ -14,7 +14,7 @@
 <style>
   :root { --ink:#1f1f22; --cream:#fbf6ec; --yellow:#ffd54a; --red:#e8402f; --gray:#8a8a8a; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html, body { -webkit-text-size-adjust:100%; text-size-adjust:100%; margin:0; height:100%; background:#2a2622; overflow:hidden; font-family:"Noto Sans KR",sans-serif; color:var(--ink); }
+  html, body { -webkit-text-size-adjust:100%; text-size-adjust:100%; margin:0; height:100%; height:var(--vh, 100%); overscroll-behavior:none; background:#2a2622; overflow:hidden; font-family:"Noto Sans KR",sans-serif; color:var(--ink); }
   #game { position:fixed; top:0; left:50%; transform:translateX(-50%); width:min(100vw, 520px); height:100%; touch-action:none; display:block; }
   .top { position:fixed; left:max(12px, calc(50vw - 248px)); right:max(12px, calc(50vw - 248px)); top:10px; display:flex; justify-content:space-between; align-items:center; pointer-events:none; }
   .chip { pointer-events:auto; background:rgba(255,255,255,.92); border-radius:999px; padding:6px 12px; font-size:13px; font-weight:700; box-shadow:0 2px 8px rgba(0,0,0,.18); }
@@ -48,7 +48,7 @@
   .phrases button:first-child { background:var(--yellow); }
   .snap { position:fixed; right:max(12px, calc(50vw - 248px)); bottom:16px; border:0; border-radius:999px; background:var(--yellow); color:var(--ink); font-family:"Jua",sans-serif; font-size:18px; padding:11px 20px; box-shadow:0 3px 10px rgba(0,0,0,.3); cursor:pointer; display:none; }
   .snap.show { display:block; }
-  .modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; padding:16px; }
+  .modal { position:fixed; left:0; right:0; top:0; height:var(--vh, 100%); background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; padding:16px; }
   .modal.open { display:flex; }
   .modal .box { position:relative; background:#fff; border-radius:20px; padding:14px; width:min(100%, 420px); }
   .modal img { width:100%; border-radius:12px; display:block; }
@@ -88,7 +88,7 @@
   .snackbar.show { display:block; }
   .snackbar b { font-family:"Jua",sans-serif; font-weight:400; color:var(--yellow); margin-right:6px; font-size:15px; }
   .snackbar small { color:#ddd; font-size:12px; }
-  .chooser { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; padding:16px; z-index:25; }
+  .chooser { position:fixed; left:0; right:0; top:0; height:var(--vh, 100%); background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; padding:16px; z-index:25; }
   .chooser.open { display:flex; }
   .chooser .box { background:#fff; border-radius:20px; padding:20px 18px; width:min(100%, 340px); text-align:center; }
   .chooser .ct { font-family:"Jua",sans-serif; font-size:24px; }
@@ -97,12 +97,12 @@
   .chooser button.any { background:#f1f1f1; font-size:16px; }
   .top .lefts { display:flex; gap:6px; pointer-events:auto; }
   .chip.ward { cursor:pointer; background:var(--yellow); }
-  .chooser .box.pick { width:min(100%, 380px); max-height:calc(var(--vh, 100dvh) - 24px); max-height:calc(var(--vh, 100vh) - 24px); overflow:hidden; display:flex; flex-direction:column; padding:16px 14px; }
+  .chooser .box.pick { width:min(100%, 380px); max-height:calc(100vh - 24px); max-height:calc(var(--vh, 100vh) - 24px); overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; display:flex; flex-direction:column; padding:16px 14px; }
   .chooser .box.pick > * { flex:none; }
   .pick .tabs { display:flex; gap:6px; margin:10px 0 8px; }
   .pick .tabs button { margin:0; padding:9px; font-size:16px; background:#f1f1f1; }
   .pick .tabs button.on { background:var(--yellow); }
-  .pick .box .grid, .pick .grid { flex:0 1 auto !important; min-height:90px; display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; padding:2px; }
+  .pick .box .grid, .pick .grid { flex:0 1 auto !important; min-height:120px; display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; padding:2px; }
   #rankList { flex:0 1 auto !important; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
   .pick .grid button { position:relative; margin:0; padding:4px 2px 6px; background:#faf6ee; border:2px solid transparent; border-radius:12px; font-size:12px; line-height:1.2; word-break:keep-all; }
   .pick .grid button.on { border-color:var(--ink); background:var(--yellow); }
@@ -126,14 +126,26 @@
   .tree-box canvas { max-height:56vh; object-fit:contain; }
   .modal .login.strong { color:var(--red); font-size:14px; font-weight:900; }
   /* 오락실 게임 창: 광장 위에 화면 전체로 띄움 */
-  .gamebox { position:fixed; left:0; right:0; top:0; height:100vh; height:100dvh; z-index:30; background:#fbf6ec; display:none; flex-direction:column; }
+  .gamebox { position:fixed; left:0; right:0; top:0; height:100vh; height:100dvh; height:var(--vh, 100dvh); z-index:30; background:#fbf6ec; display:none; flex-direction:column; }
   .gamebox.open { display:flex; }
   .gamebox .bar { flex:none; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; background:#2a2420; color:#fff; font-family:"Jua",sans-serif; font-size:17px; }
   .gamebox .bar .back { background:#fff; color:#2a2420; border:0; border-radius:10px; padding:6px 10px; font-family:"Jua",sans-serif; font-size:15px; }
   .gamebox .gscore { color:#FFD54A; font-size:15px; min-width:60px; text-align:right; }
   .gamebox iframe { flex:1 1 auto; width:100%; border:0; display:block; background:#fbf6ec; }
 </style>
-<script src="inapp.js?v=1"></script>
+<script>
+  // 실제로 보이는 화면 높이를 --vh 로 (스레드·카카오톡 같은 앱 안 브라우저는 100vh가 도구 막대까지 포함해서 아래가 잘림)
+  (function () {
+    function setVH() {
+      var h = window.visualViewport ? window.visualViewport.height : 0; if (!(h > 200)) h = window.innerHeight; if (!(h > 200)) return;
+      document.documentElement.style.setProperty('--vh', Math.round(h) + 'px');
+    }
+    setVH();
+    addEventListener('resize', setVH);
+    addEventListener('orientationchange', function () { setTimeout(setVH, 300); });
+    if (window.visualViewport) visualViewport.addEventListener('resize', setVH);
+  })();
+</script>
 </head><body><canvas id="game"></canvas>
 <div class="top">
   <div class="lefts"><div class="chip" id="me">들어가는 중</div><div class="chip ward" id="wardBtn">옷장</div><div class="chip ward" id="rankBtn">순위</div></div>
@@ -242,7 +254,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="pets.js?v=28"></script>
 <script src="lab/score.js?v=5"></script>
-<script src="app.js?v=34"></script>
+<script src="app.js?v=35"></script>
 <script src="extras.js?v=34"></script>
 </body>
 </html>
