@@ -422,17 +422,17 @@ let carpet = null;
 function carpetCanvas() {
   if (carpet) return carpet;
   const c = document.createElement('canvas'); c.width = PLAZA.w; c.height = PLAZA.h - 190;
+  // 11.10 대표님 "정신없다" → 무늬를 확 줄이고 흐리게. 큰 타일 줄 + 드문드문 작은 별만
   const g = c.getContext('2d');
-  g.fillStyle = '#2A2350'; g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = '#262046'; g.fillRect(0, 0, c.width, c.height);
+  g.strokeStyle = 'rgba(255,255,255,.05)'; g.lineWidth = 2;
+  for (let x = 0; x <= c.width; x += 120) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, c.height); g.stroke(); }
+  for (let y = 0; y <= c.height; y += 120) { g.beginPath(); g.moveTo(0, y); g.lineTo(c.width, y); g.stroke(); }
   let s = 7; const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280;
-  g.lineWidth = 4; g.lineCap = 'round'; g.lineJoin = 'round';
-  for (let i = 0; i < 320; i++) {
-    const x = rnd() * c.width, y = rnd() * c.height, k = rnd(), col = NEON[i % NEON.length];
-    g.globalAlpha = 0.45; g.strokeStyle = col; g.fillStyle = col;
-    if (k < 0.28) { g.beginPath(); g.arc(x, y, 6 + rnd() * 6, 0, Math.PI * 2); g.stroke(); }
-    else if (k < 0.52) { g.beginPath(); g.moveTo(x, y - 9); g.lineTo(x + 9, y + 7); g.lineTo(x - 9, y + 7); g.closePath(); g.stroke(); }
-    else if (k < 0.8) { g.beginPath(); g.moveTo(x - 14, y); for (let j = 1; j <= 4; j++) g.lineTo(x - 14 + j * 7, y + (j % 2 ? -6 : 6)); g.stroke(); }
-    else { g.fillRect(x - 3, y - 3, 6, 6); }
+  for (let i = 0; i < 70; i++) {
+    const x = rnd() * c.width, y = rnd() * c.height, r = 2 + rnd() * 2.5;
+    g.globalAlpha = 0.18 + rnd() * 0.12; g.fillStyle = NEON[i % NEON.length];
+    g.beginPath(); for (let j = 0; j < 8; j++) { const a = (j / 8) * Math.PI * 2, rr2 = j % 2 ? r * 0.4 : r * 1.6; g.lineTo(x + Math.cos(a) * rr2, y + Math.sin(a) * rr2); } g.closePath(); g.fill();
   }
   g.globalAlpha = 1;
   return (carpet = c);
@@ -493,7 +493,7 @@ function drawBooth(t) {
   rr(c.x - 80, c.y - 28, 160, 52, 10); ctx.fillStyle = '#6B4A30'; ctx.fill();
   rr(c.x - 80, c.y - 28, 160, 14, 10); ctx.fillStyle = '#8A6343'; ctx.fill();
   if (!bot.home || (bot.say && Date.now() < bot.say.until)) return;   // 도둑냥이 청소하러 나가면 부스는 비어 있음
-  const lines = ['어서 와, 여긴 도둑냥 오락실이야', '게임기 앞에 서면 바로 할 수 있어', '게임 한 판 끝내면 사료 한 알이 모여', '300알 모이면 사료나 간식을 보호소로 보내', '매시 정각엔 간식 타임, 1분 동안 많이 주워', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 빗자루가 치워', '물음표 게임기는 곧 열려'];
+  const lines = ['어서 와, 여긴 도둑냥 오락실이야', '게임기 앞에 서면 바로 할 수 있어', '게임 한 판 끝내면 간식 한 알이 모여', '300알 모이면 간식을 보호소로 보내', '매시 정각엔 간식 타임, 1분 동안 많이 주워', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 빗자루가 치워', '물음표 게임기는 곧 열려'];
   const msg = lines[Math.floor(t / 4) % lines.length];
   ctx.font = '18px Jua'; const w = ctx.measureText(msg).width + 24;
   const bx = c.x + 30, by = c.y - 172;
@@ -1477,7 +1477,7 @@ function frame(now) {
   if (openShelf >= 0 && n !== openShelf) { sheet.classList.remove('open'); openShelf = -1; }
   if (n !== dismissed) dismissed = -1;   // 닫았던 선반을 벗어나면 다시 열릴 수 있게
 
-  const conn = net.mode === 'local' ? ' · 테스트' : net.status === 'SUBSCRIBED' ? '' : net.status === 'CONNECTING' ? ' · 연결 중' : ' · 끊김';
+  const conn = '';   // 연결 상태(끊김·연결 중) 표시는 뺌 (대표님 11.10)
   document.getElementById('count').innerHTML = `<b>${peers.size + 1}</b>마리${conn}`;
   requestAnimationFrame(frame);
 }
