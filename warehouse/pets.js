@@ -296,10 +296,15 @@ function drawHead(ctx, b, hx, hy, headR, headCol, snout, t, seed) {
 }
 
 // ---------- 소품 (포토존에서 고르면 다른 손님에게도 보임) ----------
+// need: 오락실 옷장에서 풀리는 데 필요한 "끝낸 게임 판 수" (11.10 대표님: 게임 몇 회 이상 하면 예쁜 옷·액세서리가 풀리게)
 const ACCESSORIES = [
-  { id: '', name: '없음' }, { id: 'ribbon', name: '리본' }, { id: 'crown', name: '왕관' }, { id: 'party', name: '꼬깔모자' },
-  { id: 'beanie', name: '비니' }, { id: 'glasses', name: '선글라스' }, { id: 'flower', name: '꽃' }, { id: 'bowtie', name: '나비넥타이' },
-  { id: 'scarf', name: '목도리' }, { id: 'mask', name: '도둑 복면' },
+  { id: '', name: '없음', need: 0 },
+  { id: 'ribbon', name: '리본', need: 0 }, { id: 'flower', name: '꽃', need: 0 }, { id: 'bowtie', name: '나비넥타이', need: 0 },
+  { id: 'glasses', name: '선글라스', need: 1 }, { id: 'beanie', name: '비니', need: 2 }, { id: 'scarf', name: '목도리', need: 3 },
+  { id: 'cap', name: '야구모자', need: 4 }, { id: 'headphones', name: '헤드폰', need: 5 }, { id: 'bandana', name: '반다나', need: 7 },
+  { id: 'party', name: '꼬깔모자', need: 10 }, { id: 'santa', name: '산타모자', need: 12 }, { id: 'tiara', name: '티아라', need: 15 },
+  { id: 'crown', name: '왕관', need: 20 }, { id: 'pirate', name: '해적모자', need: 25 }, { id: 'mask', name: '도둑 복면', need: 30 },
+  { id: 'halo', name: '천사 링', need: 40 },
 ];
 // 머리 기준(hx, hy, 반지름 R) 좌표. 얼굴이 향하는 쪽이 +x
 function drawAccessory(ctx, acc, hx, hy, R) {
@@ -364,6 +369,45 @@ function drawAccessory(ctx, acc, hx, hy, R) {
     petRR(ctx, x - R * 0.65, y, R * 0.34, R * 0.85, R * 0.12); ctx.fill(); ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 1.5;
     for (const dx of [-0.4, 0, 0.4]) { ctx.beginPath(); ctx.moveTo(x + R * dx, y - R * 0.16); ctx.lineTo(x + R * dx, y + R * 0.18); ctx.stroke(); }
+  }
+  // ---------- 11.10 옷장에 새로 넣은 것 ----------
+  if (acc === 'cap') {   // 야구모자: 둥근 머리 + 앞으로 챙
+    ctx.beginPath(); ctx.ellipse(hx, hy - R * 0.4, R * 0.98, R * 0.72, 0, Math.PI, Math.PI * 2); ctx.closePath(); ctx.fillStyle = '#3D5FB0'; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(hx + R * 0.95, hy - R * 0.42, R * 0.62, R * 0.16, -0.08, 0, Math.PI * 2); ctx.fillStyle = '#2E4A8C'; ctx.fill(); ctx.stroke();
+    dot(hx, hy - R * 1.1, R * 0.12, '#FFD54A');
+    ctx.fillStyle = '#fff'; ctx.font = `${Math.round(R * 0.5)}px Jua`; ctx.textAlign = 'center'; ctx.fillText('D', hx + R * 0.15, hy - R * 0.55);
+  }
+  if (acc === 'headphones') {   // 헤드폰: 머리 위 띠 + 양쪽 귀 덮개
+    ctx.lineWidth = R * 0.2; ctx.strokeStyle = '#3A3550'; ctx.beginPath(); ctx.arc(hx, hy - R * 0.1, R * 1.02, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
+    ctx.lineWidth = 2; ctx.strokeStyle = OUT;
+    for (const s of [-1, 1]) { petRR(ctx, hx + s * R * 0.98 - R * 0.2, hy - R * 0.3, R * 0.4, R * 0.62, R * 0.18); ctx.fillStyle = '#FF5DA2'; ctx.fill(); ctx.stroke(); }
+  }
+  if (acc === 'bandana') {   // 반다나: 목에 묶은 삼각 스카프 (빨강 + 흰 점)
+    const x = hx - R * 0.15, y = hy + R * 0.78;
+    ctx.beginPath(); ctx.moveTo(x - R * 0.85, y - R * 0.1); ctx.lineTo(x + R * 0.85, y - R * 0.1); ctx.lineTo(x, y + R * 0.7); ctx.closePath(); ctx.fillStyle = '#E8402F'; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff'; for (const [dx, dy] of [[-0.4, 0.08], [0.35, 0.05], [0, 0.32], [-0.12, 0.08], [0.15, 0.2]]) { ctx.beginPath(); ctx.arc(x + dx * R, y + dy * R, R * 0.06, 0, Math.PI * 2); ctx.fill(); }
+  }
+  if (acc === 'santa') {   // 산타모자: 휘어진 빨간 모자 + 흰 테두리 + 방울
+    ctx.beginPath(); ctx.moveTo(hx - R * 0.95, hy - R * 0.62); ctx.quadraticCurveTo(hx - R * 0.6, hy - R * 1.9, hx - R * 1.55, hy - R * 1.45); ctx.quadraticCurveTo(hx + R * 0.2, hy - R * 1.75, hx + R * 0.95, hy - R * 0.62); ctx.closePath();
+    ctx.fillStyle = '#E8402F'; ctx.fill(); ctx.stroke();
+    petRR(ctx, hx - R * 1.05, hy - R * 0.78, R * 2.1, R * 0.34, R * 0.17); ctx.fillStyle = '#FFFFFF'; ctx.fill(); ctx.stroke();
+    dot(hx - R * 1.55, hy - R * 1.45, R * 0.22, '#FFFFFF');
+  }
+  if (acc === 'tiara') {   // 티아라: 은색 띠 + 뾰족 + 분홍 보석
+    const y = hy - R * 0.78;
+    ctx.beginPath(); ctx.moveTo(hx - R * 0.7, y); for (let i = 0; i <= 6; i++) { const x = hx - R * 0.7 + (i / 6) * R * 1.4; ctx.lineTo(x, y - (i % 2 ? R * 0.18 : (i === 3 ? R * 0.5 : R * 0.32))); } ctx.lineTo(hx + R * 0.7, y); ctx.closePath();
+    ctx.fillStyle = '#DDE3EA'; ctx.fill(); ctx.stroke();
+    dot(hx, y - R * 0.28, R * 0.12, '#FF7FA8');
+  }
+  if (acc === 'pirate') {   // 해적모자: 검은 양쪽 뿔 모자 + 금색 테
+    ctx.beginPath(); ctx.moveTo(hx - R * 1.3, hy - R * 0.6); ctx.quadraticCurveTo(hx, hy - R * 1.95, hx + R * 1.3, hy - R * 0.6); ctx.quadraticCurveTo(hx, hy - R * 0.95, hx - R * 1.3, hy - R * 0.6); ctx.closePath();
+    ctx.fillStyle = '#26232A'; ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#FFD54A'; ctx.lineWidth = R * 0.08; ctx.beginPath(); ctx.moveTo(hx - R * 1.15, hy - R * 0.68); ctx.quadraticCurveTo(hx, hy - R * 1.02, hx + R * 1.15, hy - R * 0.68); ctx.stroke();
+    ctx.lineWidth = 2; ctx.strokeStyle = OUT; dot(hx, hy - R * 1.3, R * 0.14, '#FFFFFF');
+  }
+  if (acc === 'halo') {   // 천사 링: 머리 위에 떠 있는 노란 고리
+    ctx.save(); ctx.shadowColor = '#FFE680'; ctx.shadowBlur = R * 0.6;
+    ctx.lineWidth = R * 0.18; ctx.strokeStyle = '#FFD54A'; ctx.beginPath(); ctx.ellipse(hx, hy - R * 1.45, R * 0.75, R * 0.22, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
   }
   ctx.restore();
 }
