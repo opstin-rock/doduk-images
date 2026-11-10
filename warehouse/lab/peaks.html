@@ -117,7 +117,7 @@
     <li><b>가져올 게 없으면</b> 왼쪽 <span class="hl">더미</span>를 눌러 새 카드를 펼쳐. 더미가 다 떨어지고 가져올 것도 없으면 끝</li>
     <li><b>점수</b>: 연달아 가져올수록 커져 (더미를 넘기면 연속이 끊겨). 봉우리 꼭대기는 +50, 판을 다 깨면 보너스</li>
   </ol>
-  <p class="muted">한 판을 끝낼 때마다 보호소에 보낼 <b>사료 한 알</b>이 쌓여 (하루 20알까지, 300알 모이면 사료나 간식 1개를 보내). 처음 판에서는 누를 수 있는 카드가 노랗게 빛나</p>
+  <p class="muted">한 판을 끝낼 때마다 보호소에 보낼 <b>간식 한 알</b>이 쌓여 (하루 20알까지, 300알 모이면 간식 1개를 보내). 처음 판에서는 누를 수 있는 카드가 노랗게 빛나</p>
   <button class="main" id="startBtn">시작</button>
 </div></div>
 
@@ -334,7 +334,7 @@
   addEventListener('pagehide', () => { sendGained(true); kibbleIfPlayed(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) sendGained(true); });
   function showEveryone(el, given, kib) {
-    el.innerHTML = `<div><span>보호소에 보낼 사료 한 알</span><b id="${el.id}Kib">보내는 중</b></div>` +
+    el.innerHTML = `<div><span>보호소에 보낼 간식 한 알</span><b id="${el.id}Kib">보내는 중</b></div>` +
       `<div><span>이번에 모두의 점수에 보탬</span><b>+${Score.fmt(given)}</b></div>` +
       `<div><span>내가 지금까지 보탠 점수</span><b>${Score.fmt(Score.mine())}</b></div>` +
       `<div class="total"><span>모두의 점수</span><b id="${el.id}Total">불러오는 중</b></div>`;
@@ -357,7 +357,7 @@
       `<div><span>남은 더미 ${stock.length}장 × 20</span><b>+${stock.length * 20}</b></div>` +
       `<div class="total"><span>지금까지 점수</span><b>${score}점</b></div>` +
       `<div><span>모두의 점수에 보탬</span><b>+${Score.fmt(given)}</b></div>` +
-      `<div><span>보호소에 보낼 사료 한 알</span><b id="kibClear">보내는 중</b></div>`;
+      `<div><span>보호소에 보낼 간식 한 알</span><b id="kibClear">보내는 중</b></div>`;
     showKibble('kibClear', kib);
     setTimeout(() => document.getElementById('clearBox').classList.add('open'), 600);
   }
