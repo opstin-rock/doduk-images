@@ -420,7 +420,7 @@ function renderWardrobe() {
   if (peek) info.innerHTML = `<b>${escHtml(peek.name)}</b> 미리 입어 보는 중 · 게임 <b>${peek.need - n}판</b> 더 하면 입을 수 있어`;
   else info.innerHTML = `끝낸 게임 <b>${n}판</b>${next ? ` · ${next.need - n}판 더 하면 ${escHtml(next.name)}` : ' · 다 풀었어'}<br>잠긴 것도 눌러서 미리 입어 볼 수 있어`;
   drawWardPreview(peek ? peek.id : me.acc);
-  const grid = document.getElementById('accGrid'), keep = grid.scrollTop; grid.innerHTML = '';
+  const grid = document.getElementById('accGrid'), scroller = grid.closest('.box'), keep = scroller.scrollTop; grid.innerHTML = '';
   for (const a of ACCESSORIES) {
     const open = n >= (a.need || 0);
     const btn = document.createElement('button');
@@ -435,7 +435,7 @@ function renderWardrobe() {
     grid.appendChild(btn);
     faceIcon(btn.querySelector('canvas'), me.breed, a.id);
   }
-  grid.scrollTop = keep;   // 고를 때마다 목록이 맨 위로 튀지 않게
+  scroller.scrollTop = keep;   // 고를 때마다 맨 위로 튀지 않게
 }
 document.getElementById('wardBtn').onclick = () => { peekAcc = null; wardEl.classList.add('open'); renderWardrobe(); };
 document.getElementById('wardClose').onclick = () => { peekAcc = null; wardEl.classList.remove('open'); if (me.acc) speech.set(myId, { text: '어때', until: Date.now() + 1500 }); };
