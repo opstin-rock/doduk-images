@@ -132,6 +132,64 @@
   }
   const NEON_PINK = '#FF5DA2';
 
+  // ---------- 순위 전광판 (11.10 대표님): 입구 바로 앞, 뒷줄 게임기 사이. 게임마다 1~3등 + 내 등수 ----------
+  const RANK = { x: 720, y: 1230, w: 470 };   // y는 다리 밑동
+  const rankRect = () => ({ x: RANK.x - RANK.w / 2, y: RANK.y - 268, w: RANK.w, h: 232 });
+  let tops = { sacheon: null, peaks: null }, myRanks = null;
+  async function loadRanks() {
+    if (!window.Score || !Score.board) return;
+    const [a, b, m] = await Promise.all([Score.board('sacheon', 3), Score.board('peaks', 3), Score.myInfo()]);
+    if (a) tops.sacheon = a;
+    if (b) tops.peaks = b;
+    if (m && m.ok) myRanks = m;
+  }
+  if (!film) { loadRanks(); setInterval(loadRanks, 30000); }
+  const cut = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+  function drawRankBoard(t) {
+    const r = rankRect(), { x } = RANK;
+    ctx.fillStyle = '#3A3550'; ctx.fillRect(r.x + 30, r.y + r.h - 4, 12, RANK.y - r.y - r.h + 4); ctx.fillRect(r.x + r.w - 42, r.y + r.h - 4, 12, RANK.y - r.y - r.h + 4);   // 다리
+    ctx.save(); ctx.shadowColor = '#4FD1FF'; ctx.shadowBlur = 18;
+    R(ctx, r.x, r.y, r.w, r.h, 16); ctx.fillStyle = '#121A2E'; ctx.fill(); ctx.restore();
+    ctx.strokeStyle = '#4FD1FF'; ctx.lineWidth = 4; R(ctx, r.x, r.y, r.w, r.h, 16); ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.save(); ctx.shadowColor = '#FFD54A'; ctx.shadowBlur = 8; ctx.fillStyle = '#FFD54A'; ctx.font = '26px Jua'; ctx.fillText('순위 전광판', x, r.y + 36); ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.font = '13px Jua'; ctx.fillText('게임마다 각자 최고 점수 · 눌러서 크게 보기', x, r.y + 56);
+    const MEDAL = ['#FFD54A', '#D9DEE8', '#E0A36B'];
+    [['sacheon', '사천성'], ['peaks', '트라이피크']].forEach(([id, name], col) => {
+      const cx = r.x + r.w * (col ? 0.75 : 0.25), left = cx - r.w * 0.23, right = cx + r.w * 0.23;
+      ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = '18px Jua'; ctx.fillText(name, cx, r.y + 84);
+      const list = tops[id];
+      for (let i = 0; i < 3; i++) {
+        const yy = r.y + 112 + i * 28, row = list && list[i];
+        ctx.fillStyle = MEDAL[i]; ctx.beginPath(); ctx.arc(left + 10, yy - 6, 10, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#121A2E'; ctx.font = '14px Jua'; ctx.textAlign = 'center'; ctx.fillText(row ? row.rank : i + 1, left + 10, yy - 1);
+        ctx.textAlign = 'left'; ctx.font = '16px Jua';
+        ctx.fillStyle = row && me.name && row.name === me.name ? '#FFD54A' : row ? '#fff' : 'rgba(255,255,255,.3)';
+        ctx.fillText(row ? cut(row.name, 6) : (i === 0 && list && !list.length ? '1등 비어 있음' : '-'), left + 26, yy);
+        if (row) { ctx.textAlign = 'right'; ctx.fillStyle = '#FFD54A'; ctx.fillText(kib(row.score), right, yy); }
+      }
+    });
+    ctx.strokeStyle = 'rgba(79,209,255,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, r.y + 70); ctx.lineTo(x, r.y + 178); ctx.stroke();
+    // 내 등수 줄
+    const g = (id) => myRanks && myRanks.games && myRanks.games[id];
+    let mine;
+    if (!me.name) mine = g('sacheon') || g('peaks') ? '별명을 정하면 내 등수도 여기 떠 (왼쪽 위 이름)' : '별명 정하고 한 판 하면 내 등수가 떠';
+    else {
+      const part = (id, nm) => (g(id) && g(id).rank ? `${nm} ${g(id).rank}등` : `${nm} -`);
+      mine = `${cut(me.name, 8)} · ${part('sacheon', '사천성')} · ${part('peaks', '트라이피크')}`;
+    }
+    R(ctx, r.x + 16, r.y + r.h - 44, r.w - 32, 30, 10); ctx.fillStyle = Math.sin(t * 2) > -0.6 ? 'rgba(255,213,74,.16)' : 'rgba(255,213,74,.08)'; ctx.fill();
+    ctx.textAlign = 'center'; ctx.fillStyle = '#FFE58A'; ctx.font = '16px Jua'; ctx.fillText(mine, x, r.y + r.h - 23);
+  }
+  const nearRank = () => isPlaza() && Math.abs(me.x - RANK.x) < RANK.w / 2 - 20 && me.y > RANK.y - 10 && me.y < RANK.y + 110;
+  const openRank = () => document.getElementById('rankBtn').click();
+  // 전광판을 직접 눌러도 순위판이 열림
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!isPlaza() || openGame) return;
+    const wx = (e.offsetX * dpr) / scale + camX, wy = (e.offsetY * dpr) / scale + camY, r = rankRect();
+    if (wx > r.x && wx < r.x + r.w && wy > r.y && wy < r.y + r.h) setTimeout(openRank, 250);
+  });
+
   // 게임 창 열기/닫기
   const gameBox = document.getElementById('gameBox'), gameFrame = document.getElementById('gameFrame');
   const arcadeBtn = document.getElementById('arcadeBtn');
@@ -148,18 +206,18 @@
   function closeArcade() {
     gameBox.classList.remove('open'); window.plazaPaused = false;
     gameFrame.src = 'about:blank';   // 게임 화면이 닫히면서 남은 점수를 보냄 (pagehide)
-    openGame = null; loadTotal();
+    openGame = null; loadTotal(); setTimeout(loadRanks, 1500);   // 방금 낸 점수가 순위에 반영되게
     if (pendingUnlock) { speech.set(myId, { text: `${pendingUnlock.name} 풀렸다, 옷장 가 보자`, until: Date.now() + 3500 }); pendingUnlock = null; }
   }
   arcadeBtn.onclick = () => {
-    const gm = nearGame(); if (!gm) return;
+    const gm = nearGame(); if (!gm) { if (nearRank()) openRank(); return; }
     if (gm.soon) { speech.set(myId, { text: '뭐가 들어올지 아직 비밀이래', until: Date.now() + 2500 }); return; }
     openArcade(gm);
   };
   document.getElementById('gameClose').onclick = closeArcade;
   addEventListener('message', (e) => {
     const d = e.data;
-    if (d && d.type === 'doduk-name') { if (typeof setMyName === 'function') setMyName(d.name); return; }   // 게임 결과창에서 별명을 정함
+    if (d && d.type === 'doduk-name') { if (typeof setMyName === 'function') setMyName(d.name); setTimeout(loadRanks, 500); return; }   // 게임 결과창에서 별명을 정함
     if (d && d.type === 'doduk-game-done') {   // 한 판 끝냄 → 새로 풀린 소품이 있으면 알려 줌
       const got = ACCESSORIES.find((a) => a.need === d.n);
       if (got) { document.getElementById('gameGive').textContent = `새 옷: ${got.name}`; pendingUnlock = got; }
@@ -299,12 +357,13 @@
   // ---------- 광장에 그리기 + 버튼 표시 ----------
   plazaHooks.push((items, t) => {
     items.push({ y: BOARD.y - 150, draw: () => drawBoard(t) });   // 전광판은 게임기 뒤
+    items.push({ y: RANK.y, draw: () => drawRankBoard(t) });   // 순위 전광판 (뒤에 선 손님은 가려지고, 앞에 선 손님은 위로)
     for (const gm of GAMES) items.push({ y: gm.y, draw: () => drawCabinet(gm, t) });
     if (treeOn()) items.push({ y: TREE.y + 20, draw: () => drawPlazaTree(t) });
   });
   frameHooks.push(() => {
-    const gm = nearGame(), a = !!gm && still() && !openGame;
-    if (a) { const label = gm.soon ? '??? · 곧 열려' : `${gm.name} 하기`; if (arcadeBtn.textContent !== label) arcadeBtn.textContent = label; }
+    const gm = nearGame(), nr = !gm && nearRank(), a = (!!gm || nr) && still() && !openGame;
+    if (a) { const label = nr ? '순위판 크게 보기' : gm.soon ? '??? · 곧 열려' : `${gm.name} 하기`; if (arcadeBtn.textContent !== label) arcadeBtn.textContent = label; }
     if (a !== arcadeBtn.classList.contains('show')) arcadeBtn.classList.toggle('show', a);
     const tr = nearTree() && still() && !treeEl.classList.contains('open');
     if (tr !== treeBtn.classList.contains('show')) treeBtn.classList.toggle('show', tr);
