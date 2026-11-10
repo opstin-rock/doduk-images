@@ -43,7 +43,10 @@ const myId = Math.random().toString(36).slice(2, 10);
 const me = { id: myId, breed: Math.floor(Math.random() * BREEDS.length), scene: 'hall', x: ENTRY.x, y: ENTRY.y, tx: ENTRY.x, ty: ENTRY.y, acc: '' };
 try { me.acc = localStorage.getItem('doduk-acc') || ''; } catch {}   // 옷장에서 고른 소품은 다음에 와도 유지   // 들어오면 입구에 서 있음
 try { const b = Number(localStorage.getItem('doduk-breed')); if (localStorage.getItem('doduk-breed') !== null && BREEDS[b]) me.breed = b; } catch {}   // 지난번에 고른 품종
-document.getElementById('me').textContent = `나: ${BREEDS[me.breed].name}`;
+me.name = window.Score ? Score.myName() : '';   // 순위판 별명 (없으면 품종 이름으로 보임)
+const nameOk = (n) => !!(window.Score && Score.nameOk(n));   // 다른 손님이 보낸 이름도 같은 규칙으로 거름
+const meText = () => `나: ${me.name || BREEDS[me.breed].name}`;
+document.getElementById('me').textContent = meText();
 const isPlaza = () => me.scene === 'hall';
 const size = () => (isPlaza() ? PLAZA : ROOM);
 
@@ -95,8 +98,9 @@ function onPeer(p) {
   if (p.id === myId) return;
   if (p.scene !== me.scene) { peers.delete(p.id); return; }
   const cur = peers.get(p.id);
-  if (cur) { cur.breed = p.breed; cur.acc = p.acc; cur.seen = Date.now(); cur.goneAt = 0; return; }   // 이동은 Broadcast가 맡음
-  peers.set(p.id, { breed: p.breed, acc: p.acc, x: p.tx, y: p.ty, tx: p.tx, ty: p.ty, seq: 0, seen: Date.now(), goneAt: 0 });
+  const name = nameOk(p.name) ? p.name : '';
+  if (cur) { cur.breed = p.breed; cur.acc = p.acc; cur.name = name; cur.seen = Date.now(); cur.goneAt = 0; return; }   // 이동은 Broadcast가 맡음
+  peers.set(p.id, { breed: p.breed, acc: p.acc, name, x: p.tx, y: p.ty, tx: p.tx, ty: p.ty, seq: 0, seen: Date.now(), goneAt: 0 });
   greetNewcomer();
 
 }
@@ -112,7 +116,7 @@ function onMove(m) {
   if (!cur) { cur = { breed: m.breed, x: m.sx, y: m.sy, seq: 0 }; peers.set(m.id, cur); greetNewcomer(); }
   if (m.seq <= cur.seq) return;   // 늦게 도착한 예전 이동은 무시
   if (Math.hypot(cur.x - m.sx, cur.y - m.sy) > 50) { cur.x = m.sx; cur.y = m.sy; }
-  Object.assign(cur, { breed: m.breed, acc: m.acc ?? cur.acc, tx: m.tx, ty: m.ty, seq: m.seq, seen: Date.now(), goneAt: 0 });
+  Object.assign(cur, { breed: m.breed, acc: m.acc ?? cur.acc, name: m.name === undefined ? cur.name : nameOk(m.name) ? m.name : '', tx: m.tx, ty: m.ty, seq: m.seq, seen: Date.now(), goneAt: 0 });
   if (cur.act && cur.act.a === 'sleep') cur.act = null;   // 움직이면 잠에서 깸
 }
 
@@ -160,8 +164,8 @@ function onAct(id, a, x, y) {
 const net = (() => {
   const cfg = location.search.includes('film') ? {} : window.DODUK || {};   // 홍보 영상 촬영(?film)은 실제 손님과 섞이지 않게 혼자 모드
   let seq = 0;
-  const presence = () => ({ id: me.id, breed: me.breed, acc: me.acc, scene: me.scene, tx: Math.round(me.tx), ty: Math.round(me.ty), ts: Date.now() });
-  const move = () => ({ id: me.id, breed: me.breed, acc: me.acc, scene: me.scene, sx: Math.round(me.x), sy: Math.round(me.y), tx: Math.round(me.tx), ty: Math.round(me.ty), seq: ++seq });
+  const presence = () => ({ id: me.id, breed: me.breed, acc: me.acc, name: me.name || '', scene: me.scene, tx: Math.round(me.tx), ty: Math.round(me.ty), ts: Date.now() });
+  const move = () => ({ id: me.id, breed: me.breed, acc: me.acc, name: me.name || '', scene: me.scene, sx: Math.round(me.x), sy: Math.round(me.y), tx: Math.round(me.tx), ty: Math.round(me.ty), seq: ++seq });
   if (cfg.supabaseUrl && cfg.supabaseKey && window.supabase) {
     // worker: 화면이 뒤로 가도 연결 유지 신호(heartbeat)가 밀리지 않게 별도 작업자에서 보냄
     const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, { realtime: { worker: true } });
@@ -340,21 +344,62 @@ function renderPick() {
 function applyBreed(i) {
   me.breed = i;
   try { localStorage.setItem('doduk-breed', String(i)); } catch {}
-  meChip.textContent = `나: ${BREEDS[me.breed].name}`;
+  meChip.textContent = meText();
   buildButtons(); net.send();
   chooserEl.classList.remove('open');
   speech.set(myId, { text: phraseText(0, me.breed), until: Date.now() + 1800 });
 }
-function setKind(kind) {   // (예전 호출용) 그 종류 안에서 아무나
+// 별명 (11.10 대표님: 겹치지 않는 아이디 + 게임별 순위판). 비워 두면 별명 없이 들어감
+const nickInput = document.getElementById('nickInput'), nickMsg = document.getElementById('nickMsg');
+let entering = false;
+async function enter(i) {
+  if (entering) return;
+  const n = (nickInput.value || '').trim();
+  if (n && n !== me.name) {
+    if (!window.Score) { nickMsg.textContent = '별명은 잠시 뒤에 다시 정해 줘'; }
+    else {
+      entering = true; nickMsg.textContent = '별명 확인 중';
+      const r = await Score.setName(n);
+      entering = false;
+      if (r.ok) { me.name = r.name; nickMsg.textContent = ''; }
+      else if (r.reason !== 'net') { nickMsg.textContent = Score.nameMsg(r.reason); nickInput.focus(); return; }   // 겹치거나 안 되는 말이면 다시
+      else speech.set(myId, { text: '연결이 안 돼서 별명은 나중에', until: Date.now() + 2500 });
+    }
+  }
+  applyBreed(i);
+}
+function setKind(kind) {   // 그 종류 안에서 아무나
   const list = BREEDS.map((b, i) => i).filter((i) => !kind || BREEDS[i].kind === kind);
-  applyBreed(list[Math.floor(Math.random() * list.length)]);
+  return list[Math.floor(Math.random() * list.length)];
 }
 chooserEl.querySelectorAll('.tabs button').forEach((t) => { t.onclick = () => { pickTab = t.dataset.tab; renderPick(); }; });
-document.getElementById('pickRandom').onclick = () => setKind(pickTab);
-document.getElementById('pickGo').onclick = () => applyBreed(pickIdx);
+document.getElementById('pickRandom').onclick = () => enter(setKind(pickTab));
+document.getElementById('pickGo').onclick = () => enter(pickIdx);
+nickInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); enter(pickIdx); } });
+function openChooser() {
+  pickTab = BREEDS[me.breed].kind; pickIdx = me.breed;
+  nickInput.value = me.name || ''; nickMsg.textContent = '';
+  chooserEl.classList.add('open'); renderPick();
+}
 meChip.style.cursor = 'pointer';
-meChip.onclick = () => { pickTab = BREEDS[me.breed].kind; pickIdx = me.breed; chooserEl.classList.add('open'); renderPick(); };
-if (!location.search.match(/film|lineup|demo/)) { chooserEl.classList.add('open'); requestAnimationFrame(renderPick); }
+meChip.onclick = openChooser;
+if (!location.search.match(/film|lineup|demo/)) openChooser();
+// 다른 곳(게임 결과창)에서 별명을 정하면 여기도 바꿈
+function setMyName(n) { if (!nameOk(n)) return; me.name = n; meChip.textContent = meText(); net.send(); }
+// 다른 폰·예전 기록에서 서버에 별명이 있으면 맞춤
+if (window.Score) Score.myInfo().then((r) => { if (r && r.ok && r.name && r.name !== me.name) { try { localStorage.setItem('doduk-name', JSON.stringify(r.name)); } catch {} setMyName(r.name); } });
+
+// ---------- 순위판: 게임마다 각자 최고 점수 ----------
+const rankEl = document.getElementById('rankBox'), rankList = document.getElementById('rankList');
+let rankGame = 'sacheon';
+function renderRank() {
+  rankEl.querySelectorAll('#rankTabs button').forEach((t) => t.classList.toggle('on', t.dataset.game === rankGame));
+  if (window.Score) Score.renderBoard(rankList, rankGame, { limit: 10 }).then(() => { if (Score.myName() && Score.myName() !== me.name) setMyName(Score.myName()); });
+  else rankList.textContent = '아직 못 불러왔어';
+}
+rankEl.querySelectorAll('#rankTabs button').forEach((t) => { t.onclick = () => { rankGame = t.dataset.game; renderRank(); }; });
+document.getElementById('rankBtn').onclick = () => { rankEl.classList.add('open'); renderRank(); };
+document.getElementById('rankClose').onclick = () => rankEl.classList.remove('open');
 
 // ---------- 옷장: 끝낸 게임 판 수만큼 소품이 풀림 (게임 쪽에서 doduk-games-done 을 올림) ----------
 const wardEl = document.getElementById('wardrobe');
