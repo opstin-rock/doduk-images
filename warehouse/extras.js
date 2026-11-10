@@ -21,8 +21,8 @@
   // =====================================================================
   const GAMES = [
     // 광장 전체가 오락실 (2026-11-09). 앞줄: 지금 할 수 있는 게임, 뒷줄: 만드는 중 (불 꺼진 게임기)
-    { id: 'sacheon', name: '사천성', x: 560, y: 900, url: 'lab/link.html?embed=1&v=12', body: '#E8402F', screen: 'sacheon' },
-    { id: 'peaks', name: '트라이피크', x: 720, y: 900, url: 'lab/peaks.html?embed=1&v=7', body: '#3D7BD9', screen: 'peaks' },
+    { id: 'sacheon', name: '사천성', x: 560, y: 900, url: 'lab/link.html?embed=1&v=13', body: '#E8402F', screen: 'sacheon' },
+    { id: 'peaks', name: '트라이피크', x: 720, y: 900, url: 'lab/peaks.html?embed=1&v=8', body: '#3D7BD9', screen: 'peaks' },
     // 아직 안 연 게임은 이름을 숨김 (대표님 11.10: "???"로)
     { id: 'soon1', name: '???', x: 880, y: 900, soon: true, body: '#8C7FA8' },
     { id: 'soon2', name: '???', x: 400, y: 1230, soon: true, body: '#8C7FA8' },
@@ -81,10 +81,14 @@
     ctx.fillStyle = '#FFD54A'; ctx.fillText(gm.name, x, y + 28);
   }
   // 전광판: 다리 달린 큰 화면. y는 다리 밑동, 화면은 그 위
-  //   보호소에 사료 보내기: 한 판 = 사료 한 알, 300알마다 사료나 간식 1개 (보낼 곳은 정하는 중)
+  //   보호소에 간식 보내기: 한 판 = 사료 한 알, 300알마다 사료나 간식 1개 (보낼 곳은 정하는 중)
   //   왼쪽 액자: 최근 인증 사진 (shipments.photo_url)
   const kib = (n) => Number(n || 0).toLocaleString('ko-KR');
-  function drawKibble(cx, cy, r, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.8, 0.4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.arc(cx - r * 0.3, cy - r * 0.25, r * 0.3, 0, Math.PI * 2); ctx.fill(); }
+  // 막대 속 작은 간식 (뼈다귀 모양)
+  function drawKibble(cx, cy, r, col) {
+    ctx.fillStyle = col; ctx.fillRect(cx - r, cy - r * 0.3, r * 2, r * 0.6);
+    for (const [dx, dy] of [[-1, -0.35], [-1, 0.35], [1, -0.35], [1, 0.35]]) { ctx.beginPath(); ctx.arc(cx + dx * r, cy + dy * r, r * 0.42, 0, Math.PI * 2); ctx.fill(); }
+  }
   function drawBoard(t) {
     const { x, y, w } = BOARD, top = y - 330, hgt = 236;
     ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 3;
@@ -95,14 +99,14 @@
     const n = Math.floor(w / 16);
     for (let i = 0; i < n; i++) { const on = Math.sin(t * 5 + i) > 0; ctx.fillStyle = on ? '#FFD54A' : 'rgba(255,213,74,.25)'; ctx.beginPath(); ctx.arc(x - w / 2 + 14 + i * ((w - 28) / (n - 1)), top + 12, 3.5, 0, Math.PI * 2); ctx.fill(); }
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#fff'; ctx.font = '24px Jua'; ctx.fillText('보호소에 사료 보내기', x, top + 46);
-    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.font = '15px Jua'; ctx.fillText('게임 한 판 = 사료 한 알 · 300알마다 사료나 간식 1개 · 보낼 곳은 정하는 중', x, top + 70);
+    ctx.fillStyle = '#fff'; ctx.font = '24px Jua'; ctx.fillText('보호소에 간식 보내기', x, top + 46);
+    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.font = '15px Jua'; ctx.fillText('게임 한 판 = 간식 한 알 · 300알 모이면 간식 1개 · 보낼 곳은 정하는 중', x, top + 70);
     // 진행 막대
     const goal = prog ? prog.goal : 300, cur = prog ? Math.min(prog.current, goal) : 0, done = prog && prog.current >= goal;
     const bx = x - w / 2 + 28, bw = w - 56, by = top + 86, bh = 34;
     R(ctx, bx, by, bw, bh, 17); ctx.fillStyle = '#2B2550'; ctx.fill();
     if (cur > 0) { R(ctx, bx, by, Math.max(34, bw * (cur / goal)), bh, 17); ctx.fillStyle = done ? (Math.sin(t * 6) > 0 ? '#FFD54A' : '#FF8A3D') : '#C9965F'; ctx.fill(); }
-    for (let i = 0; i < Math.min(14, Math.floor((bw * (cur / goal)) / 26)); i++) drawKibble(bx + 16 + i * 26, by + bh / 2, 7, i % 2 ? '#8A5C37' : '#A8754A');   // 막대 속 사료알
+    for (let i = 0; i < Math.min(14, Math.floor((bw * (cur / goal)) / 26)); i++) drawKibble(bx + 16 + i * 26, by + bh / 2, 7, i % 2 ? '#FFF6E6' : '#FFE0B8');   // 막대 속 사료알
     ctx.strokeStyle = '#FFD54A'; ctx.lineWidth = 2; R(ctx, bx, by, bw, bh, 17); ctx.stroke();
     ctx.save(); ctx.shadowColor = '#FFD54A'; ctx.shadowBlur = 10; ctx.fillStyle = '#FFD54A'; ctx.font = '40px Jua';
     ctx.fillText(prog ? (done ? '목표 달성! 보내는 중' : `${kib(cur)} / ${kib(goal)}알`) : '- / 300알', x, by + bh + 46); ctx.restore();
@@ -110,7 +114,7 @@
     const dog = prog ? prog.today_dog : 0, cat = prog ? prog.today_cat : 0;
     ctx.fillText(`오늘 +${kib(prog ? prog.today : 0)}알 · 강아지팀 ${kib(dog)} vs 고양이팀 ${kib(cat)}`, x, by + bh + 76);
     ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.font = '14px Jua';
-    ctx.fillText(`지금까지 보낸 것 ${kib(prog ? prog.sent : 0)}번 · 모두의 점수 ${everyone ? kib(everyone.total) : '-'}${myKibbles ? ` · 내가 모은 사료 ${myKibbles}알` : ''}`, x, by + bh + 100);
+    ctx.fillText(`지금까지 보낸 것 ${kib(prog ? prog.sent : 0)}번 · 모두의 점수 ${everyone ? kib(everyone.total) : '-'}${myKibbles ? ` · 내가 모은 간식 ${myKibbles}알` : ''}`, x, by + bh + 100);
     // 인증 사진 액자 (전광판 오른쪽)
     const fx = x + w / 2 + 20, fy = top + 40, fw = 128, fh = 150;
     ctx.save(); ctx.translate(fx + fw / 2, fy + fh / 2); ctx.rotate(-0.05);
@@ -156,7 +160,7 @@
     if (d && d.type === 'doduk-kibble') {   // 사료 한 알 모음 → 전광판 막대 바로 올리기
       myKibbles++;
       if (prog) { prog = { ...prog, total: prog.total + 1, current: prog.current + 1, today: prog.today + 1, [d.team === 'cat' ? 'today_cat' : 'today_dog']: (prog[d.team === 'cat' ? 'today_cat' : 'today_dog'] || 0) + 1 }; }
-      document.getElementById('gameGive').textContent = `사료 +${myKibbles}알`;
+      document.getElementById('gameGive').textContent = `간식 +${myKibbles}알`;
       setTimeout(loadTotal, 1500);
       return;
     }
