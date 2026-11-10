@@ -21,8 +21,8 @@
   // =====================================================================
   const GAMES = [
     // 광장 전체가 오락실 (2026-11-09). 앞줄: 지금 할 수 있는 게임, 뒷줄: 만드는 중 (불 꺼진 게임기)
-    { id: 'sacheon', name: '사천성', x: 560, y: 900, url: 'lab/link.html?embed=1&v=15', body: '#E8402F', screen: 'sacheon' },
-    { id: 'peaks', name: '트라이피크', x: 720, y: 900, url: 'lab/peaks.html?embed=1&v=10', body: '#3D7BD9', screen: 'peaks' },
+    { id: 'sacheon', name: '사천성', x: 560, y: 900, url: 'lab/link.html?embed=1&v=16', body: '#E8402F', screen: 'sacheon' },
+    { id: 'peaks', name: '트라이피크', x: 720, y: 900, url: 'lab/peaks.html?embed=1&v=11', body: '#3D7BD9', screen: 'peaks' },
     // 아직 안 연 게임은 이름을 숨김 (대표님 11.10: "???"로)
     { id: 'soon1', name: '???', x: 880, y: 900, soon: true, body: '#8C7FA8' },
     { id: 'soon2', name: '???', x: 400, y: 1230, soon: true, body: '#8C7FA8' },
@@ -159,6 +159,7 @@
   document.getElementById('gameClose').onclick = closeArcade;
   addEventListener('message', (e) => {
     const d = e.data;
+    if (d && d.type === 'doduk-name') { if (typeof setMyName === 'function') setMyName(d.name); return; }   // 게임 결과창에서 별명을 정함
     if (d && d.type === 'doduk-game-done') {   // 한 판 끝냄 → 새로 풀린 소품이 있으면 알려 줌
       const got = ACCESSORIES.find((a) => a.need === d.n);
       if (got) { document.getElementById('gameGive').textContent = `새 옷: ${got.name}`; pendingUnlock = got; }
