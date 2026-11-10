@@ -143,11 +143,11 @@
   // 오류가 나면 화면 아래에 한 줄로 보여줌 (폰에서 원인 알려 주기용)
   window.addEventListener('error', (e) => { const el = document.getElementById('err'); el.style.display = 'block'; el.textContent = '오류: ' + (e.message || e.type); });
 </script>
-<script src="../pets.js?v=26"></script>
+<script src="../pets.js?v=27"></script>
 <script src="haptic.js?v=1"></script>
 <script src="sfx.js?v=1"></script>
 <script src="../config.js?v=26"></script>
-<script src="score.js?v=3"></script>
+<script src="score.js?v=4"></script>
 <script>if (location.search.includes('embed')) document.documentElement.classList.add('embed');</script>
 <script>
 (() => {
@@ -340,7 +340,7 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden) sendGained(true); });
   // 사료 한 알: 한 단계를 끝내면 (깨거나, 시간 끝·처음부터 전에 짝 5개 이상 없앴으면) 한 알. 단계마다 한 번만
   let stagePairs = 0, kibbleDone = false;
-  function giveKibble() { if (kibbleDone) return Promise.resolve(undefined); kibbleDone = true; return Score.kibble('sacheon'); }
+  function giveKibble() { if (kibbleDone) return Promise.resolve(undefined); kibbleDone = true; Score.gameDone(); return Score.kibble('sacheon'); }
   function kibbleIfPlayed() { return running && stagePairs >= 5 ? giveKibble() : Promise.resolve(undefined); }
   const kibbleText = (r) => r === undefined ? '짝 5개 이상 없애면 한 알' : r && r.ok ? `+1 (오늘 ${r.today}/20)` : r && r.reason === 'cap' ? '오늘 20알 다 모았어' : '나중에 다시 보낼게';
   function showKibble(id, promise) { promise.then((r) => { const el = document.getElementById(id); if (el) el.textContent = kibbleText(r); if (r && r.ok) Sfx.kibble(); }); }
