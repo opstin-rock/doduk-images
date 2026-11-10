@@ -1529,7 +1529,7 @@ let lastT = performance.now();
 function frame(now) {
   // 오락실 게임 창이 열려 있으면 광장은 쉬게 함 (폰에서 둘 다 그리면 느려짐)
   if (window.plazaPaused) { lastT = now; requestAnimationFrame(frame); return; }
-  const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+  const dt = Math.max(0, Math.min(0.05, (now - lastT) / 1000)); lastT = now;   // 시간이 거꾸로 오면(다른 시계 섞임) 0으로: 캐릭터가 반대로 튀어 나가지 않게
   const t = now / 1000;
   step(me, dt);
   for (const [id, p] of peers) {
