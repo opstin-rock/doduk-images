@@ -95,6 +95,21 @@
   .chooser .cs { font-size:12px; color:var(--gray); margin:6px 0 14px; line-height:1.5; }
   .chooser button { display:block; width:100%; border:0; border-radius:14px; padding:13px; margin-top:8px; font-family:"Jua",sans-serif; font-size:19px; background:var(--yellow); color:var(--ink); cursor:pointer; }
   .chooser button.any { background:#f1f1f1; font-size:16px; }
+  .top .lefts { display:flex; gap:6px; pointer-events:auto; }
+  .chip.ward { cursor:pointer; background:var(--yellow); }
+  .chooser .box.pick { width:min(100%, 380px); max-height:calc(var(--vh, 100dvh) - 24px); overflow-y:auto; padding:16px 14px; }
+  .pick .tabs { display:flex; gap:6px; margin:10px 0 8px; }
+  .pick .tabs button { margin:0; padding:9px; font-size:16px; background:#f1f1f1; }
+  .pick .tabs button.on { background:var(--yellow); }
+  .pick .grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; max-height:46vh; overflow-y:auto; padding:2px; }
+  .pick .grid button { margin:0; padding:4px 2px 6px; background:#faf6ee; border:2px solid transparent; border-radius:12px; font-size:12px; line-height:1.2; word-break:keep-all; }
+  .pick .grid button.on { border-color:var(--ink); background:var(--yellow); }
+  .pick .grid button.locked { opacity:.45; }
+  .pick .grid canvas { display:block; width:54px; height:54px; margin:0 auto 2px; }
+  .pick .row2 { display:flex; gap:8px; margin-top:10px; }
+  .pick .row2 button { margin:0; }
+  .pick .row2 .go { background:var(--ink); color:#fff; }
+  #wardPreview { display:block; width:200px; height:150px; margin:4px auto 0; }
   .game-box canvas, .tree-box canvas { width:100%; display:block; border-radius:12px; touch-action:none; }
   .game-box .save, .tree-box .save { background:#f1f1f1; color:var(--ink); }
   .tree-box .chips { margin-top:10px; justify-content:center; }
@@ -110,21 +125,30 @@
   .gamebox iframe { flex:1 1 auto; width:100%; border:0; display:block; background:#fbf6ec; }
 </style></head><body><canvas id="game"></canvas>
 <div class="top">
-  <div class="chip" id="me">들어가는 중</div>
+  <div class="lefts"><div class="chip" id="me">들어가는 중</div><div class="chip ward" id="wardBtn">옷장</div></div>
   <div class="chip" id="count">지금 <b>1</b>마리 구경 중</div>
 </div>
 <button class="chip music" id="music">음악 끄기</button>
 <div class="snackbar" id="snackBar"></div>
 <div class="chooser" id="chooser">
-  <div class="box">
+  <div class="box pick">
     <div class="ct">누구로 들어갈래?</div>
-    <div class="cs">품종은 그 안에서 랜덤이야. 왼쪽 위 이름을 누르면 다시 고를 수 있어</div>
-    <button data-kind="dog">강아지</button>
-    <button data-kind="cat">고양이</button>
-    <button data-kind="" class="any">아무거나</button>
+    <div class="tabs"><button data-tab="dog" class="on">강아지</button><button data-tab="cat">고양이</button></div>
+    <div class="grid" id="breedGrid"></div>
+    <div class="row2"><button id="pickRandom" class="any">아무나 골라 줘</button><button id="pickGo" class="go">이걸로 들어가기</button></div>
+    <div class="cs">왼쪽 위 이름을 누르면 언제든 다시 고를 수 있어</div>
   </div>
 </div>
-<div class="hint" id="hint">바닥을 누르면 걸어가 · 오락기 앞에 서면 게임</div>
+<div class="chooser" id="wardrobe">
+  <div class="box pick">
+    <div class="ct">옷장</div>
+    <canvas id="wardPreview" width="240" height="180"></canvas>
+    <div class="cs" id="wardInfo"></div>
+    <div class="grid" id="accGrid"></div>
+    <div class="row2"><button id="wardClose" class="go">다 입었어</button></div>
+  </div>
+</div>
+<div class="hint" id="hint">바닥을 누르면 걸어가 · 게임기 앞에 서면 게임 · 왼쪽 위 옷장</div>
 <button class="talk" id="talk">말풍선</button>
 <button class="talk act" id="act">행동</button>
 <div class="phrases" id="phrases"></div>
@@ -194,9 +218,9 @@
 </div>
 <script src="config.js?v=26"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="pets.js?v=26"></script>
-<script src="app.js?v=31"></script>
-<script src="lab/score.js?v=3"></script>
-<script src="extras.js?v=32"></script>
+<script src="pets.js?v=27"></script>
+<script src="app.js?v=32"></script>
+<script src="lab/score.js?v=4"></script>
+<script src="extras.js?v=33"></script>
 </body>
 </html>
