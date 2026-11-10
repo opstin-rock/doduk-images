@@ -41,7 +41,8 @@ resize();
 // ---------- 나 ----------
 const myId = Math.random().toString(36).slice(2, 10);
 const me = { id: myId, breed: Math.floor(Math.random() * BREEDS.length), scene: 'hall', x: ENTRY.x, y: ENTRY.y, tx: ENTRY.x, ty: ENTRY.y, acc: '' };
-try { me.acc = localStorage.getItem('doduk-acc') || ''; } catch {}   // 포토존에서 고른 소품은 다음에 와도 유지   // 들어오면 입구에 서 있음
+try { me.acc = localStorage.getItem('doduk-acc') || ''; } catch {}   // 옷장에서 고른 소품은 다음에 와도 유지   // 들어오면 입구에 서 있음
+try { const b = Number(localStorage.getItem('doduk-breed')); if (localStorage.getItem('doduk-breed') !== null && BREEDS[b]) me.breed = b; } catch {}   // 지난번에 고른 품종
 document.getElementById('me').textContent = `나: ${BREEDS[me.breed].name}`;
 const isPlaza = () => me.scene === 'hall';
 const size = () => (isPlaza() ? PLAZA : ROOM);
@@ -304,23 +305,85 @@ ACTIONS.forEach((d) => {
 }
 buildButtons();
 
-// ---------- 입장: 강아지 / 고양이 고르기 (품종은 그 안에서 랜덤). 왼쪽 위 "나: ..." 누르면 다시 고름 ----------
+// ---------- 입장: 품종 직접 고르기 (11.10 대표님: 처음에 자유롭게 캐릭터 선택). 왼쪽 위 "나: ..." 누르면 다시 고름 ----------
 const chooserEl = document.getElementById('chooser');
 const meChip = document.getElementById('me');
-function setKind(kind) {
-  const pool = BREEDS.map((b, i) => ({ b, i })).filter(({ b, i }) => (!kind || b.kind === kind) && i !== me.breed);
-  const list = pool.length ? pool : BREEDS.map((b, i) => ({ b, i }));
-  me.breed = list[Math.floor(Math.random() * list.length)].i;
+// 얼굴 아이콘 (품종 고르기·옷장 공용): 머리만 가운데에, acc가 있으면 소품까지
+function faceIcon(cv, breed, acc) {
+  const dpr2 = 2, w = cv.clientWidth || 54, h = cv.clientHeight || 54;
+  cv.width = w * dpr2; cv.height = h * dpr2;
+  const q = cv.getContext('2d'); q.setTransform(dpr2, 0, 0, dpr2, 0, 0); q.clearRect(0, 0, w, h);
+  const b = BREEDS[breed], headR = b.headR ?? 16, snout = b.snout ?? (b.kind === 'dog' ? 7 : 0);
+  const k = Math.min(w / (headR * 2.6 + snout + 10), h / (headR * 2.9 + 16));
+  q.save(); q.translate(w / 2, h * 0.58); q.scale(k, k);
+  q.lineWidth = 2.4; q.strokeStyle = '#2a2420'; q.lineJoin = 'round'; q.lineCap = 'round';
+  const hx = -(snout - headR * 0.17) / 2;
+  drawHead(q, b, hx, 0, headR, b.head ?? b.base, snout, 0.3, breed);
+  if (acc) drawAccessory(q, acc, hx, 0, headR);
+  q.restore();
+}
+let pickTab = BREEDS[me.breed].kind, pickIdx = me.breed;
+const breedGrid = document.getElementById('breedGrid');
+function renderPick() {
+  chooserEl.querySelectorAll('.tabs button').forEach((t) => t.classList.toggle('on', t.dataset.tab === pickTab));
+  breedGrid.innerHTML = '';
+  BREEDS.forEach((b, i) => {
+    if (b.kind !== pickTab) return;
+    const btn = document.createElement('button');
+    btn.className = i === pickIdx ? 'on' : '';
+    btn.innerHTML = `<canvas></canvas>${b.name}`;
+    btn.onclick = () => { pickIdx = i; renderPick(); };
+    breedGrid.appendChild(btn);
+    faceIcon(btn.querySelector('canvas'), i, me.acc);
+  });
+}
+function applyBreed(i) {
+  me.breed = i;
+  try { localStorage.setItem('doduk-breed', String(i)); } catch {}
   meChip.textContent = `나: ${BREEDS[me.breed].name}`;
-  try { localStorage.setItem('doduk-kind', kind || ''); } catch {}
   buildButtons(); net.send();
   chooserEl.classList.remove('open');
   speech.set(myId, { text: phraseText(0, me.breed), until: Date.now() + 1800 });
 }
-chooserEl.querySelectorAll('button[data-kind]').forEach((b) => { b.onclick = () => setKind(b.dataset.kind); });
+function setKind(kind) {   // (예전 호출용) 그 종류 안에서 아무나
+  const list = BREEDS.map((b, i) => i).filter((i) => !kind || BREEDS[i].kind === kind);
+  applyBreed(list[Math.floor(Math.random() * list.length)]);
+}
+chooserEl.querySelectorAll('.tabs button').forEach((t) => { t.onclick = () => { pickTab = t.dataset.tab; renderPick(); }; });
+document.getElementById('pickRandom').onclick = () => setKind(pickTab);
+document.getElementById('pickGo').onclick = () => applyBreed(pickIdx);
 meChip.style.cursor = 'pointer';
-meChip.onclick = () => chooserEl.classList.add('open');
-if (!location.search.match(/film|lineup|demo/)) chooserEl.classList.add('open');
+meChip.onclick = () => { pickTab = BREEDS[me.breed].kind; pickIdx = me.breed; chooserEl.classList.add('open'); renderPick(); };
+if (!location.search.match(/film|lineup|demo/)) { chooserEl.classList.add('open'); requestAnimationFrame(renderPick); }
+
+// ---------- 옷장: 끝낸 게임 판 수만큼 소품이 풀림 (게임 쪽에서 doduk-games-done 을 올림) ----------
+const wardEl = document.getElementById('wardrobe');
+const gamesDone = () => { try { return Number(localStorage.getItem('doduk-games-done')) || 0; } catch { return 0; } };
+function renderWardrobe() {
+  const n = gamesDone(), next = ACCESSORIES.find((a) => a.need > n);
+  document.getElementById('wardInfo').textContent = `끝낸 게임 ${n}판${next ? ` · ${next.need - n}판 더 하면 ${next.name}` : ' · 다 풀었어'}`;
+  const pv = document.getElementById('wardPreview'), q = pv.getContext('2d');
+  q.setTransform(1, 0, 0, 1, 0, 0); q.clearRect(0, 0, pv.width, pv.height);
+  drawPet(q, { breed: me.breed, acc: me.acc, x: pv.width / 2 - 10, y: pv.height - 22, tx: pv.width / 2 - 10, ty: pv.height - 22, face: 1, noTag: true }, performance.now() / 1000, false);
+  const grid = document.getElementById('accGrid'); grid.innerHTML = '';
+  for (const a of ACCESSORIES) {
+    const open = n >= (a.need || 0);
+    const btn = document.createElement('button');
+    btn.className = `${a.id === me.acc ? 'on' : ''} ${open ? '' : 'locked'}`;
+    btn.innerHTML = `<canvas></canvas>${open ? a.name : `${a.need}판 하면`}`;
+    btn.onclick = () => {
+      if (!open) { speech.set(myId, { text: `게임 ${a.need - n}판 더 하면 ${a.name}`, until: Date.now() + 2200 }); return; }
+      me.acc = a.id; try { localStorage.setItem('doduk-acc', a.id); } catch {}
+      net.send(); renderWardrobe();
+    };
+    grid.appendChild(btn);
+    faceIcon(btn.querySelector('canvas'), me.breed, open ? a.id : '');
+  }
+}
+document.getElementById('wardBtn').onclick = () => { wardEl.classList.add('open'); requestAnimationFrame(renderWardrobe); };
+document.getElementById('wardClose').onclick = () => { wardEl.classList.remove('open'); if (me.acc) speech.set(myId, { text: '어때', until: Date.now() + 1500 }); };
+// 예전에 고른 소품이 아직 안 풀린 거면 벗김 (판 수 기준이 새로 생겨서)
+{ const a = ACCESSORIES.find((x) => x.id === me.acc); if (a && gamesDone() < (a.need || 0)) { me.acc = ''; try { localStorage.setItem('doduk-acc', ''); } catch {} } }
 document.getElementById('talk').onclick = () => { phrasesEl.classList.toggle('open'); actionsEl.classList.remove('open'); };
 document.getElementById('act').onclick = () => { actionsEl.classList.toggle('open'); phrasesEl.classList.remove('open'); };
 
