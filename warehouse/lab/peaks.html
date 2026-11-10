@@ -75,7 +75,7 @@
   .mc.no { opacity:.55; }
   .mc.no::after { content:""; position:absolute; left:-4px; right:-4px; top:50%; height:3px; background:#E8402F; transform:rotate(-35deg); }
   .exnote { font-size:12px; line-height:1.5; opacity:.95; }
-  .tools .small { flex:0 0 66px; font-size:15px; }
+  .tools .small { flex:0 0 52px; font-size:14px; padding-left:0; padding-right:0; }
   .tools .off { color:var(--muted); }
 </style>
 </head>
@@ -91,8 +91,9 @@
   <div class="stage"><canvas id="board"></canvas></div>
   <div class="tools">
     <button id="rulesBtn" class="small">규칙</button>
-    <button id="undoBtn">되돌리기 1</button>
-    <button id="restartBtn">처음부터</button>
+    <button id="undoBtn">무르기 1</button>
+    <button id="restartBtn">다시</button>
+    <button id="soundBtn" class="small">소리 켬</button>
     <button id="vibeBtn" class="small">진동 켬</button>
   </div>
 </div>
@@ -153,6 +154,7 @@
 </script>
 <script src="../pets.js?v=26"></script>
 <script src="haptic.js?v=1"></script>
+<script src="sfx.js?v=1"></script>
 <script src="../config.js?v=26"></script>
 <script src="score.js?v=3"></script>
 <script>if (location.search.includes('embed')) document.documentElement.classList.add('embed');</script>
@@ -260,7 +262,7 @@
   }
   // 못 가져오는 카드를 누르면: 흔들고, 지금 펼친 카드 기준으로 뭘 누를 수 있는지 알려줌
   function nope(i) {
-    wiggle = { i, at: performance.now() }; Haptic.nope();
+    wiggle = { i, at: performance.now() }; Haptic.nope(); Sfx.nope();
     const t = top().r, lo = t === 1 ? 13 : t - 1, hi = t === 13 ? 1 : t + 1;
     const b = (r) => [3, 6, 7, 8, 10].includes(r);   // 삼·육·칠·팔·십은 받침 있음 (조사 맞추기)
     toast(`펼친 카드가 ${RANK_TXT[t]}${b(t) ? '이라서' : '라서'} ${RANK_TXT[lo]}${b(lo) ? '이나' : '나'} ${RANK_TXT[hi]}만 가져올 수 있어`);
@@ -284,9 +286,9 @@
     score += gain;
     anims.push({ card, fx: from.x, fy: from.y, fs: 1, tx: wasteX, ty: baseY, ts: BIG, at: now, dur: 200, faceUp: true });
     burst(from.x + cw / 2, from.y + ch / 2, streak - 1, gain, now, card);
-    if (SLOTS[i].row === 0) { score += 50; floats.push({ x: from.x + cw / 2, y: from.y + ch + 6, text: '봉우리 +50', born: now, cb: 6, size: 20 }); }
+    if (SLOTS[i].row === 0) { score += 50; Sfx.bonus(); floats.push({ x: from.x + cw / 2, y: from.y + ch + 6, text: '봉우리 +50', born: now, cb: 6, size: 20 }); }
     bestStreak = Math.max(bestStreak, streak); playsMade++; dealTaken++;
-    if (leftCards()) Haptic.combo(streak - 1); else Haptic.big();   // 누른 순간에 울려야 아이폰에서도 됨
+    if (leftCards()) { Haptic.combo(streak - 1); Sfx.match(streak - 1); } else Haptic.big();   // 누른 순간에 울려야 아이폰에서도 됨
     updateHud();
     if (!leftCards()) setTimeout(clearRound, 450);
     else setTimeout(afterMove, 260);
@@ -298,6 +300,7 @@
     const card = stock.pop(); waste.push(card);
     streak = 0;
     anims.push({ card, fx: stockX, fy: baseY, fs: BIG, tx: wasteX, ty: baseY, ts: BIG, at: now, dur: 220, faceUp: true, flip: true });
+    Sfx.flip();
     updateHud(); setTimeout(afterMove, 260);
   }
   document.getElementById('undoBtn').onclick = () => {
@@ -305,11 +308,12 @@
     const h = history.pop(), card = waste.pop();
     if (h.type === 'play') tab[h.i].gone = false; else stock.push(card);
     streak = h.streak; score = h.score; undoLeft--; lastPlay = -1e9;
-    toast('한 번 되돌렸어'); updateHud();
+    Sfx.tap(); toast('한 번 되돌렸어'); updateHud();
   };
   function checkStuck() {
     if (!running || stock.length || playable().length) return;
     const kib = kibbleIfPlayed();   // running이 꺼지기 전에 확인
+    Sfx.over();
     running = false;
     const best = bestScore();
     document.getElementById('endScore').textContent = `${score}점`;
@@ -323,7 +327,7 @@
   function giveKibble() { if (kibbleDone) return Promise.resolve(undefined); kibbleDone = true; return Score.kibble('peaks'); }
   function kibbleIfPlayed() { return running && dealTaken >= 10 ? giveKibble() : Promise.resolve(undefined); }
   const kibbleText = (r) => r === undefined ? '카드 10장 이상 가져오면 한 알' : r && r.ok ? `+1 (오늘 ${r.today}/20)` : r && r.reason === 'cap' ? '오늘 20알 다 모았어' : '나중에 다시 보낼게';
-  function showKibble(id, promise) { promise.then((r) => { const el = document.getElementById(id); if (el) el.textContent = kibbleText(r); }); }
+  function showKibble(id, promise) { promise.then((r) => { const el = document.getElementById(id); if (el) el.textContent = kibbleText(r); if (r && r.ok) Sfx.kibble(); }); }
   // 모두의 점수: 아직 안 보낸 만큼만 보냄 (판 성공, 끝, 처음부터, 창 닫기 때)
   let sent = 0;
   function sendGained(keepalive) {
@@ -348,7 +352,7 @@
   function clearRound() {
     running = false;
     const bonus = 200 + stock.length * 20;
-    score += bonus; updateHud(); confetti(performance.now());
+    score += bonus; updateHud(); confetti(performance.now()); Sfx.clear();
     const given = sendGained();
     const kib = giveKibble();
     document.getElementById('clearTitle').textContent = `${round}판 다 깼다`;
@@ -370,6 +374,10 @@
   const vibeLabel = () => { vibeBtn.textContent = Haptic.on ? '진동 켬' : '진동 끔'; vibeBtn.classList.toggle('off', !Haptic.on); };
   vibeBtn.onclick = () => { Haptic.toggle(); vibeLabel(); toast(Haptic.on ? '진동 켰어' : '진동 껐어'); };
   vibeLabel();
+  const soundBtn = document.getElementById('soundBtn');
+  const soundLabel = () => { soundBtn.textContent = Sfx.on ? '소리 켬' : '소리 끔'; soundBtn.classList.toggle('off', !Sfx.on); };
+  soundBtn.onclick = () => { Sfx.toggle(); soundLabel(); toast(Sfx.on ? '소리 켰어' : '소리 껐어'); };
+  soundLabel();
   document.getElementById('againBtn').onclick = () => { document.getElementById('endBox').classList.remove('open'); start(); };
   document.getElementById('nextBtn').onclick = () => { document.getElementById('clearBox').classList.remove('open'); round++; deal(); running = true; updateHud(); toast(`${round}판`); };
   function start() { started = true; playsMade = 0; stockTipShown = false; score = 0; sent = 0; round = 1; bestStreak = 0; deal(); running = true; updateHud(); setTimeout(() => toast('노랗게 빛나는 카드를 눌러 봐'), 300); }
@@ -380,7 +388,7 @@
     document.getElementById('score').textContent = score;
     document.getElementById('left').textContent = leftCards();
     document.getElementById('stockN').textContent = stock.length;
-    document.getElementById('undoBtn').textContent = `되돌리기 ${undoLeft}`;
+    document.getElementById('undoBtn').textContent = `무르기 ${undoLeft}`;
     document.getElementById('undoBtn').disabled = undoLeft <= 0;
     const cf = document.getElementById('comboFill');
     cf.style.width = streak >= 2 ? `${Math.min(100, streak * 10)}%` : '0';
