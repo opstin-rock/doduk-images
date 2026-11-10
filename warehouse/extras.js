@@ -343,6 +343,8 @@
 
   // ---------- 홍보 영상(film.js)용 손잡이: ?film 일 때만 ----------
   if (film) window.filmExtras = {
+    // 후원 전광판 숫자 (영상에서 "간식 +1" 올라가는 장면용). p = kibble_progress 한 줄, mine = 이번에 모은 알
+    board: { set: (p, mine) => { prog = p; myKibbles = mine || 0; }, BOARD, GAMES },
     tree: {
       reset: () => { orns = []; lsSet(todayKey(), 0); },
       open: () => { renderTreeBox(); treeEl.classList.add('open'); },
