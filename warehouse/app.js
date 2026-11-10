@@ -95,8 +95,10 @@ function doors() {
 // extras.js(미니게임·트리 등)가 끼어드는 자리: 광장 그리기, 매 프레임, 실시간 메시지
 const plazaHooks = [], frameHooks = [], extraHandlers = {};
 const peers = new Map();   // id → { breed, x, y, tx, ty, seq, seen, goneAt, act }
+const okBreed = (n) => (BREEDS[n] ? n : 0);   // 모르는 품종 번호(옛 화면·새 화면 섞임)는 0번으로
 function onPeer(p) {
   if (p.id === myId) return;
+  p.breed = okBreed(p.breed);
   if (p.scene !== me.scene) { peers.delete(p.id); return; }
   const cur = peers.get(p.id);
   const name = nameOk(p.name) ? p.name : '';
@@ -113,6 +115,7 @@ function greetNewcomer() {
 }
 function onMove(m) {
   if (m.id === myId || m.scene !== me.scene) return;
+  m.breed = okBreed(m.breed);
   let cur = peers.get(m.id);
   if (!cur) { cur = { breed: m.breed, x: m.sx, y: m.sy, seq: 0 }; peers.set(m.id, cur); greetNewcomer(); }
   if (m.seq <= cur.seq) return;   // 늦게 도착한 예전 이동은 무시
@@ -332,7 +335,13 @@ const breedGrid = document.getElementById('breedGrid');
 function renderPick() {
   chooserEl.querySelectorAll('.tabs button').forEach((t) => t.classList.toggle('on', t.dataset.tab === pickTab));
   breedGrid.innerHTML = '';
-  BREEDS.forEach((b, i) => {
+  // 믹스·토종개·길고양이를 맨 앞에 (PICK_FIRST 순서), 나머지는 원래 순서
+  const order = BREEDS.map((b, i) => i).sort((a, c) => {
+    const ra = PICK_FIRST.indexOf(BREEDS[a].name), rc = PICK_FIRST.indexOf(BREEDS[c].name);
+    return (ra < 0 ? 999 + a : ra) - (rc < 0 ? 999 + c : rc);
+  });
+  order.forEach((i) => {
+    const b = BREEDS[i];
     if (b.kind !== pickTab) return;
     const btn = document.createElement('button');
     btn.className = i === pickIdx ? 'on' : '';
