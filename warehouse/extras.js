@@ -23,9 +23,10 @@
     // 광장 전체가 오락실 (2026-11-09). 앞줄: 지금 할 수 있는 게임, 뒷줄: 만드는 중 (불 꺼진 게임기)
     { id: 'sacheon', name: '사천성', x: 560, y: 900, url: 'lab/link.html?embed=1&v=12', body: '#E8402F', screen: 'sacheon' },
     { id: 'peaks', name: '트라이피크', x: 720, y: 900, url: 'lab/peaks.html?embed=1&v=7', body: '#3D7BD9', screen: 'peaks' },
-    { id: 'match3', name: '간식 3매치', x: 880, y: 900, soon: true, body: '#8C7FA8' },
-    { id: 'merge', name: '간식 합치기', x: 400, y: 1230, soon: true, body: '#8C7FA8' },
-    { id: 'pair', name: '우리 애 짝 맞추기', x: 1040, y: 1230, soon: true, body: '#8C7FA8' },
+    // 아직 안 연 게임은 이름을 숨김 (대표님 11.10: "???"로)
+    { id: 'soon1', name: '???', x: 880, y: 900, soon: true, body: '#8C7FA8' },
+    { id: 'soon2', name: '???', x: 400, y: 1230, soon: true, body: '#8C7FA8' },
+    { id: 'soon3', name: '???', x: 1040, y: 1230, soon: true, body: '#8C7FA8' },
   ];
   const BOARD = { x: 646, y: 640, w: 560 };   // 사료 보내기 전광판 + 오른쪽 인증 사진 액자, 둘을 합쳐 가운데(720)에 오도록
   const nearGame = () => {
@@ -57,8 +58,8 @@
     R(ctx, x - 34, y - 128, 68, 54, 6); ctx.fillStyle = '#1E2233'; ctx.fill(); ctx.stroke();
     // 화면 속 작은 그림 (만드는 중이면 꺼진 화면 + 테이프)
     if (gm.soon) {
-      ctx.fillStyle = '#888'; ctx.font = '13px Jua'; ctx.textAlign = 'center'; ctx.fillText('만드는 중', x, y - 96);
-      ctx.save(); ctx.translate(x, y - 100); ctx.rotate(-0.25); ctx.fillStyle = 'rgba(255,213,74,.85)'; ctx.fillRect(-46, -7, 92, 14);
+      ctx.fillStyle = Math.sin(t * 3 + x) > 0 ? '#FFD54A' : '#B79CED'; ctx.font = '26px Jua'; ctx.textAlign = 'center'; ctx.fillText('???', x, y - 88);
+      ctx.save(); ctx.translate(x, y - 116); ctx.rotate(-0.2); ctx.fillStyle = 'rgba(255,213,74,.85)'; ctx.fillRect(-46, -7, 92, 14);
       ctx.fillStyle = '#2a2420'; ctx.font = '10px Jua'; ctx.fillText('곧 열려', 0, 4); ctx.restore();
     } else if (gm.screen === 'sacheon') {
       const cols = ['#FFE3C2', '#E6F4FF', '#FDE4EC', '#DDF2E3'];
@@ -146,7 +147,7 @@
   }
   arcadeBtn.onclick = () => {
     const gm = nearGame(); if (!gm) return;
-    if (gm.soon) { speech.set(myId, { text: `${gm.name}은 아직 만드는 중이래`, until: Date.now() + 2500 }); return; }
+    if (gm.soon) { speech.set(myId, { text: '뭐가 들어올지 아직 비밀이래', until: Date.now() + 2500 }); return; }
     openArcade(gm);
   };
   document.getElementById('gameClose').onclick = closeArcade;
@@ -291,7 +292,7 @@
   });
   frameHooks.push(() => {
     const gm = nearGame(), a = !!gm && still() && !openGame;
-    if (a) { const label = gm.soon ? `${gm.name} · 준비 중` : `${gm.name} 하기`; if (arcadeBtn.textContent !== label) arcadeBtn.textContent = label; }
+    if (a) { const label = gm.soon ? '??? · 곧 열려' : `${gm.name} 하기`; if (arcadeBtn.textContent !== label) arcadeBtn.textContent = label; }
     if (a !== arcadeBtn.classList.contains('show')) arcadeBtn.classList.toggle('show', a);
     const tr = nearTree() && still() && !treeEl.classList.contains('open');
     if (tr !== treeBtn.classList.contains('show')) treeBtn.classList.toggle('show', tr);
