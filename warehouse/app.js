@@ -31,11 +31,12 @@ function resize() {
   // PC에서는 화면 가운데 폰 크기(최대 520px)로만 그림
   dpr = window.devicePixelRatio || 1;
   canvas.width = canvas.clientWidth * dpr;
-  canvas.height = innerHeight * dpr;
+  canvas.height = (canvas.clientHeight || innerHeight) * dpr;   // 실제 보이는 높이 (--vh)
   scale = (canvas.clientWidth / VIEW_W) * dpr;
   viewH = canvas.height / scale;
 }
 addEventListener('resize', resize);
+if (window.visualViewport) visualViewport.addEventListener('resize', () => setTimeout(resize, 50));
 resize();
 
 // ---------- 나 ----------
