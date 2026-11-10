@@ -97,14 +97,13 @@
   .chooser button.any { background:#f1f1f1; font-size:16px; }
   .top .lefts { display:flex; gap:6px; pointer-events:auto; }
   .chip.ward { cursor:pointer; background:var(--yellow); }
-  .chooser .box.pick { width:min(100%, 380px); max-height:calc(100vh - 24px); max-height:calc(var(--vh, 100vh) - 24px); overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; display:flex; flex-direction:column; padding:16px 14px; }
-  .chooser .box.pick > * { flex:none; }
+  .chooser .box.pick { width:min(100%, 380px); max-height:calc(100vh - 24px); max-height:calc(var(--vh, 100vh) - 24px); overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; padding:16px 14px 0; }
   .pick .tabs { display:flex; gap:6px; margin:10px 0 8px; }
   .pick .tabs button { margin:0; padding:9px; font-size:16px; background:#f1f1f1; }
   .pick .tabs button.on { background:var(--yellow); }
-  .pick .box .grid, .pick .grid { flex:0 1 auto !important; min-height:120px; display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; padding:2px; }
-  #rankList { flex:0 1 auto !important; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
-  .pick .grid button { position:relative; margin:0; padding:4px 2px 6px; background:#faf6ee; border:2px solid transparent; border-radius:12px; font-size:12px; line-height:1.2; word-break:keep-all; }
+  .pick .grid { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:6px; padding:2px; }
+  #rankList { min-height:60px; }
+  .pick .grid button { position:relative; min-width:0; overflow:hidden; margin:0; padding:4px 2px 6px; background:#faf6ee; border:2px solid transparent; border-radius:12px; font-size:12px; line-height:1.2; word-break:keep-all; }
   .pick .grid button.on { border-color:var(--ink); background:var(--yellow); }
   .pick .grid button.locked { background:#efeae0; color:#7a7064; }
   .pick .grid button.locked canvas { opacity:.8; }
@@ -112,11 +111,13 @@
   .pick .grid .need { position:absolute; top:3px; right:3px; background:var(--ink); color:#fff; font-size:10px; line-height:1; border-radius:8px; padding:3px 5px; }
   #wardInfo b { color:var(--red); }
   .pick .grid canvas { display:block; width:54px; height:54px; margin:0 auto 2px; }
-  .pick .row2 { display:flex; gap:8px; margin-top:10px; }
-  .pick .row2 button { margin:0; }
+  .pick .row2 { display:flex; gap:8px; margin-top:6px; position:-webkit-sticky; position:sticky; bottom:0; background:#fff; padding:8px 0 14px; z-index:2; }
+  .pick .row2 button { margin:0; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:13px 6px; }
   .pick .row2 .go { background:var(--ink); color:#fff; }
   .pick .namerow input { width:100%; box-sizing:border-box; font-size:16px; padding:11px 12px; margin-top:10px; border:2px solid var(--ink); border-radius:12px; font-family:inherit; text-align:center; }
-  .pick .nickmsg { font-size:12px; color:var(--red); min-height:15px; margin-top:4px; word-break:keep-all; }
+  .pick .nickmsg { font-size:12px; color:var(--red); margin-top:4px; word-break:keep-all; }
+  .pick .nickmsg:empty { display:none; }
+  .chooser .cs.nick { margin:4px 0 0; }
   
   #wardPreview { display:block; width:200px; height:150px; margin:4px auto 0; }
   .game-box canvas, .tree-box canvas { width:100%; display:block; border-radius:12px; touch-action:none; }
@@ -158,10 +159,10 @@
     <div class="ct">누구로 들어갈래?</div>
     <div class="namerow"><input id="nickInput" maxlength="8" placeholder="별명 (순위판에 나와, 2~8자)" autocomplete="off"></div>
     <div class="nickmsg" id="nickMsg"></div>
+    <div class="cs nick">별명은 다른 사람과 겹칠 수 없어. 비워 둬도 돼</div>
     <div class="tabs"><button data-tab="dog" class="on">강아지</button><button data-tab="cat">고양이</button></div>
     <div class="grid" id="breedGrid"></div>
-    <div class="row2"><button id="pickRandom" class="any">아무나 골라 줘</button><button id="pickGo" class="go">이걸로 들어가기</button></div>
-    <div class="cs">별명은 다른 사람과 겹칠 수 없어. 비워 두고 들어가도 돼<br>왼쪽 위 이름을 누르면 언제든 다시 고를 수 있어</div>
+    <div class="row2"><button id="pickRandom" class="any">아무나</button><button id="pickGo" class="go">들어가기</button></div>
   </div>
 </div>
 <div class="chooser" id="wardrobe">
@@ -254,7 +255,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="pets.js?v=28"></script>
 <script src="lab/score.js?v=5"></script>
-<script src="app.js?v=35"></script>
+<script src="app.js?v=36"></script>
 <script src="extras.js?v=34"></script>
 </body>
 </html>
