@@ -124,6 +124,7 @@
   <p id="endDetail"></p>
   <p class="muted" id="endBest"></p>
   <div class="sum" id="endEveryone"></div>
+  <div id="endBoard"></div>
   <button class="main" id="againBtn">처음부터 다시</button>
 </div></div>
 
@@ -147,7 +148,7 @@
 <script src="haptic.js?v=1"></script>
 <script src="sfx.js?v=1"></script>
 <script src="../config.js?v=26"></script>
-<script src="score.js?v=4"></script>
+<script src="score.js?v=5"></script>
 <script>if (location.search.includes('embed')) document.documentElement.classList.add('embed');</script>
 <script>
 (() => {
@@ -330,10 +331,10 @@
   }
   function bestScore() { let best = 0; try { best = +localStorage.getItem('doduk-link-best') || 0; if (score > best) localStorage.setItem('doduk-link-best', score); } catch {} return best; }
   // 모두의 점수: 아직 안 보낸 만큼만 보냄 (단계 성공, 시간 끝, 처음부터, 창 닫기 때)
-  let sent = 0;
+  let sent = 0, bestP = Promise.resolve();
   function sendGained(keepalive) {
     const gain = score - sent;
-    if (gain > 0) { sent = score; Score.send('sacheon', gain, { keepalive }); }
+    if (gain > 0) { sent = score; Score.send('sacheon', gain, { keepalive }); bestP = Score.best('sacheon', score, keepalive); }   // 순위판: 이번 판 점수(지금까지 합)를 최고 점수로
     return Math.max(0, gain);
   }
   addEventListener('pagehide', () => { sendGained(true); kibbleIfPlayed(); });
@@ -378,6 +379,9 @@
     document.getElementById('endBest').textContent = score > best ? '내 최고 기록' : `내 최고 기록 ${best}점`;
     const given = sendGained();
     showEveryone(document.getElementById('endEveryone'), given, kib);
+    const boardEl = document.getElementById('endBoard');
+    boardEl.textContent = '';
+    bestP.then(() => Score.renderBoard(boardEl, 'sacheon'));
     document.getElementById('endBox').classList.add('open');
   }
   // 결과창 아래 "모두의 점수" (합계는 서버에서 읽어 옴, 못 읽으면 내가 보탠 것만) + 사료 한 알
