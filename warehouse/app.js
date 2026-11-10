@@ -404,29 +404,40 @@ document.getElementById('rankClose').onclick = () => rankEl.classList.remove('op
 // ---------- 옷장: 끝낸 게임 판 수만큼 소품이 풀림 (게임 쪽에서 doduk-games-done 을 올림) ----------
 const wardEl = document.getElementById('wardrobe');
 const gamesDone = () => { try { return Number(localStorage.getItem('doduk-games-done')) || 0; } catch { return 0; } };
-function renderWardrobe() {
-  const n = gamesDone(), next = ACCESSORIES.find((a) => a.need > n);
-  document.getElementById('wardInfo').textContent = `끝낸 게임 ${n}판${next ? ` · ${next.need - n}판 더 하면 ${next.name}` : ' · 다 풀었어'}`;
+// 잠긴 소품도 모양·이름을 다 보여 줌 (11.10 대표님: 뭐가 있는지 알아야 함). 누르면 위 미리보기에 입혀 봄
+let peekAcc = null;
+const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+function drawWardPreview(acc) {
   const pv = document.getElementById('wardPreview'), q = pv.getContext('2d');
   q.setTransform(1, 0, 0, 1, 0, 0); q.clearRect(0, 0, pv.width, pv.height);
-  drawPet(q, { breed: me.breed, acc: me.acc, x: pv.width / 2 - 10, y: pv.height - 22, tx: pv.width / 2 - 10, ty: pv.height - 22, face: 1, noTag: true }, performance.now() / 1000, false);
-  const grid = document.getElementById('accGrid'); grid.innerHTML = '';
+  drawPet(q, { breed: me.breed, acc, x: pv.width / 2 - 10, y: pv.height - 22, tx: pv.width / 2 - 10, ty: pv.height - 22, face: 1, noTag: true }, performance.now() / 1000, false);
+}
+function renderWardrobe() {
+  const n = gamesDone(), next = ACCESSORIES.find((a) => a.need > n);
+  const info = document.getElementById('wardInfo');
+  const peek = peekAcc && ACCESSORIES.find((a) => a.id === peekAcc);
+  if (peek) info.innerHTML = `<b>${escHtml(peek.name)}</b> 미리 입어 보는 중 · 게임 <b>${peek.need - n}판</b> 더 하면 입을 수 있어`;
+  else info.innerHTML = `끝낸 게임 <b>${n}판</b>${next ? ` · ${next.need - n}판 더 하면 ${escHtml(next.name)}` : ' · 다 풀었어'}<br>잠긴 것도 눌러서 미리 입어 볼 수 있어`;
+  drawWardPreview(peek ? peek.id : me.acc);
+  const grid = document.getElementById('accGrid'), keep = grid.scrollTop; grid.innerHTML = '';
   for (const a of ACCESSORIES) {
     const open = n >= (a.need || 0);
     const btn = document.createElement('button');
-    btn.className = `${a.id === me.acc ? 'on' : ''} ${open ? '' : 'locked'}`;
-    btn.innerHTML = `<canvas></canvas>${open ? a.name : `${a.need}판 하면`}`;
+    btn.className = `${a.id === me.acc && !peek ? 'on' : ''} ${open ? '' : 'locked'} ${a.id === peekAcc ? 'peek' : ''}`;
+    btn.innerHTML = `<canvas></canvas>${escHtml(a.name)}${open ? '' : `<span class="need">${a.need}판</span>`}`;
     btn.onclick = () => {
-      if (!open) { speech.set(myId, { text: `게임 ${a.need - n}판 더 하면 ${a.name}`, until: Date.now() + 2200 }); return; }
+      if (!open) { peekAcc = peekAcc === a.id ? null : a.id; renderWardrobe(); return; }
+      peekAcc = null;
       me.acc = a.id; try { localStorage.setItem('doduk-acc', a.id); } catch {}
       net.send(); renderWardrobe();
     };
     grid.appendChild(btn);
-    faceIcon(btn.querySelector('canvas'), me.breed, open ? a.id : '');
+    faceIcon(btn.querySelector('canvas'), me.breed, a.id);
   }
+  grid.scrollTop = keep;   // 고를 때마다 목록이 맨 위로 튀지 않게
 }
-document.getElementById('wardBtn').onclick = () => { wardEl.classList.add('open'); requestAnimationFrame(renderWardrobe); };
-document.getElementById('wardClose').onclick = () => { wardEl.classList.remove('open'); if (me.acc) speech.set(myId, { text: '어때', until: Date.now() + 1500 }); };
+document.getElementById('wardBtn').onclick = () => { peekAcc = null; wardEl.classList.add('open'); renderWardrobe(); };
+document.getElementById('wardClose').onclick = () => { peekAcc = null; wardEl.classList.remove('open'); if (me.acc) speech.set(myId, { text: '어때', until: Date.now() + 1500 }); };
 // 예전에 고른 소품이 아직 안 풀린 거면 벗김 (판 수 기준이 새로 생겨서)
 { const a = ACCESSORIES.find((x) => x.id === me.acc); if (a && gamesDone() < (a.need || 0)) { me.acc = ''; try { localStorage.setItem('doduk-acc', ''); } catch {} } }
 document.getElementById('talk').onclick = () => { phrasesEl.classList.toggle('open'); actionsEl.classList.remove('open'); };
