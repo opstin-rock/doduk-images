@@ -134,6 +134,7 @@
   <p id="endDetail"></p>
   <p class="muted" id="endBest"></p>
   <div class="sum" id="endEveryone"></div>
+  <div id="endBoard"></div>
   <button class="main" id="againBtn">처음부터 다시</button>
 </div></div>
 
@@ -156,7 +157,7 @@
 <script src="haptic.js?v=1"></script>
 <script src="sfx.js?v=1"></script>
 <script src="../config.js?v=26"></script>
-<script src="score.js?v=4"></script>
+<script src="score.js?v=5"></script>
 <script>if (location.search.includes('embed')) document.documentElement.classList.add('embed');</script>
 <script>
 (() => {
@@ -320,6 +321,9 @@
     document.getElementById('endDetail').innerHTML = `${round}판까지 왔어<br>최고 ${bestStreak}연속`;
     document.getElementById('endBest').textContent = score > best ? '내 최고 기록' : `내 최고 기록 ${best}점`;
     showEveryone(document.getElementById('endEveryone'), sendGained(), kib);
+    const boardEl = document.getElementById('endBoard');
+    boardEl.textContent = '';
+    bestP.then(() => Score.renderBoard(boardEl, 'peaks'));
     setTimeout(() => document.getElementById('endBox').classList.add('open'), 500);
   }
   // 사료 한 알: 한 판(카드 한 벌)을 끝내면 (다 깨거나, 막히기·처음부터 전에 카드 10장 이상 가져왔으면) 한 알. 판마다 한 번만
@@ -329,10 +333,10 @@
   const kibbleText = (r) => r === undefined ? '카드 10장 이상 가져오면 한 알' : r && r.ok ? `+1 (오늘 ${r.today}/20)` : r && r.reason === 'cap' ? '오늘 20알 다 모았어' : '나중에 다시 보낼게';
   function showKibble(id, promise) { promise.then((r) => { const el = document.getElementById(id); if (el) el.textContent = kibbleText(r); if (r && r.ok) Sfx.kibble(); }); }
   // 모두의 점수: 아직 안 보낸 만큼만 보냄 (판 성공, 끝, 처음부터, 창 닫기 때)
-  let sent = 0;
+  let sent = 0, bestP = Promise.resolve();
   function sendGained(keepalive) {
     const gain = score - sent;
-    if (gain > 0) { sent = score; Score.send('peaks', gain, { keepalive }); }
+    if (gain > 0) { sent = score; Score.send('peaks', gain, { keepalive }); bestP = Score.best('peaks', score, keepalive); }   // 순위판: 이번 판 점수(지금까지 합)를 최고 점수로
     return Math.max(0, gain);
   }
   addEventListener('pagehide', () => { sendGained(true); kibbleIfPlayed(); });
