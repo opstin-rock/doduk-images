@@ -493,7 +493,7 @@ function drawBooth(t) {
   rr(c.x - 80, c.y - 28, 160, 52, 10); ctx.fillStyle = '#6B4A30'; ctx.fill();
   rr(c.x - 80, c.y - 28, 160, 14, 10); ctx.fillStyle = '#8A6343'; ctx.fill();
   if (!bot.home || (bot.say && Date.now() < bot.say.until)) return;   // 도둑냥이 청소하러 나가면 부스는 비어 있음
-  const lines = ['어서 와, 여긴 도둑냥 오락실이야', '게임기 앞에 서면 바로 할 수 있어', '다 같이 모은 점수만큼 보호소로 보낼 거야', '위 전광판이 모두의 점수야', '매시 정각엔 간식 타임, 1분 동안 많이 주워', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 내가 치울게', '불 꺼진 게임기는 지금 만드는 중'];
+  const lines = ['어서 와, 여긴 도둑냥 오락실이야', '게임기 앞에 서면 바로 할 수 있어', '게임 한 판 끝내면 사료 한 알이 모여', '300알 모이면 사료나 간식을 보호소로 보내', '매시 정각엔 간식 타임, 1분 동안 많이 주워', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 빗자루가 치워', '물음표 게임기는 곧 열려'];
   const msg = lines[Math.floor(t / 4) % lines.length];
   ctx.font = '18px Jua'; const w = ctx.measureText(msg).width + 24;
   const bx = c.x + 30, by = c.y - 172;
