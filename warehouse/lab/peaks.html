@@ -608,7 +608,7 @@
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(refit);
   setTimeout(refit, 300); setTimeout(refit, 1200);
   requestAnimationFrame(frame);
-  window.__peaks = { get tab() { return tab; }, get stock() { return stock; }, get waste() { return waste; }, playable, play, flip, open, get score() { return score; }, get running() { return running; }, frame, slotPos, SLOTS, layout };   // 시험용
+  window.__peaks = { get tab() { return tab; }, get stock() { return stock; }, get waste() { return waste; }, playable, play, flip, open, get score() { return score; }, get running() { return running; }, frame, slotPos, SLOTS, layout, start };   // 시험용 (start: 영상 만들 때 판 다시 나누기)
 })();
 </script>
 </body>
