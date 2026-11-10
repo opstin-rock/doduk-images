@@ -152,11 +152,11 @@
   }
   window.addEventListener('error', (e) => { const el = document.getElementById('err'); el.style.display = 'block'; el.textContent = '오류: ' + (e.message || e.type); });
 </script>
-<script src="../pets.js?v=26"></script>
+<script src="../pets.js?v=27"></script>
 <script src="haptic.js?v=1"></script>
 <script src="sfx.js?v=1"></script>
 <script src="../config.js?v=26"></script>
-<script src="score.js?v=3"></script>
+<script src="score.js?v=4"></script>
 <script>if (location.search.includes('embed')) document.documentElement.classList.add('embed');</script>
 <script>
 (() => {
@@ -324,7 +324,7 @@
   }
   // 사료 한 알: 한 판(카드 한 벌)을 끝내면 (다 깨거나, 막히기·처음부터 전에 카드 10장 이상 가져왔으면) 한 알. 판마다 한 번만
   let dealTaken = 0, kibbleDone = false;
-  function giveKibble() { if (kibbleDone) return Promise.resolve(undefined); kibbleDone = true; return Score.kibble('peaks'); }
+  function giveKibble() { if (kibbleDone) return Promise.resolve(undefined); kibbleDone = true; Score.gameDone(); return Score.kibble('peaks'); }
   function kibbleIfPlayed() { return running && dealTaken >= 10 ? giveKibble() : Promise.resolve(undefined); }
   const kibbleText = (r) => r === undefined ? '카드 10장 이상 가져오면 한 알' : r && r.ok ? `+1 (오늘 ${r.today}/20)` : r && r.reason === 'cap' ? '오늘 20알 다 모았어' : '나중에 다시 보낼게';
   function showKibble(id, promise) { promise.then((r) => { const el = document.getElementById(id); if (el) el.textContent = kibbleText(r); if (r && r.ok) Sfx.kibble(); }); }
