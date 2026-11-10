@@ -83,7 +83,7 @@ function drawPet(ctx, p, t, mine) {
   const ph = t * (b.legH && b.legH < 6 ? 18 : 12) + (p.breed * 0.7);
 
   const legH = b.legH ?? 10, legW = b.legW ?? 6.5;
-  const bodyW = b.bodyW ?? 20, bodyH = b.bodyH ?? 13, headR = b.headR ?? 16;
+  const bodyW = b.bodyW ?? 20, bodyH = b.bodyH ?? 13, headR = (b.headR ?? 16) * 1.1;   // 머리를 조금 크게 (아기 비율)
   const snout = b.snout ?? (b.kind === 'dog' ? 7 : 0);
   const bob = moving ? Math.abs(Math.sin(ph)) * 3 : Math.sin(t * 2 + p.breed) * 0.6;
   const by = -legH - bodyH * 0.7 - bob;
@@ -214,9 +214,10 @@ function drawEar(ctx, b, hx, hy, headR, layer) {
   // 늘어진 귀: 얼굴 쪽 귀는 머리 뒤에 살짝, 뒤통수 쪽 귀는 머리 앞에 (눈을 가리지 않게)
   ctx.fillStyle = col;
   if (b.ear === 'flop' || b.ear === 'longflop') {
-    const len = b.ear === 'longflop' ? 1.25 : b.fluffy ? 0.95 : 0.85;
-    const side = layer === 'back' ? 1 : -1;
-    ctx.beginPath(); ctx.ellipse(hx + side * headR * (side > 0 ? 0.55 : 0.8), hy + headR * 0.15, headR * 0.32, headR * len, side * 0.15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // 둥글고 작게, 머리 위쪽에 달려서 아래로 늘어지게 (예전엔 큰 접시처럼 보였음)
+    const len = b.ear === 'longflop' ? 0.95 : b.fluffy ? 0.72 : 0.66;
+    if (layer === 'back') { ctx.beginPath(); ctx.ellipse(hx + headR * 0.42, hy - headR * 0.35, headR * 0.26, headR * len * 0.7, -0.35, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    else { ctx.beginPath(); ctx.ellipse(hx - headR * 0.8, hy + headR * 0.02, headR * 0.26, headR * len, 0.32, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }   // 눈을 가리지 않게 뒤통수 쪽
     return;
   }
   // 접힌 귀: 머리 앞(front)에 그림
@@ -225,6 +226,7 @@ function drawEar(ctx, b, hx, hy, headR, layer) {
   if (b.ear === 'rose') for (const side of [-1, 1]) { ctx.beginPath(); ctx.ellipse(hx + side * headR * 0.7, hy - headR * 0.7, 5, 3.4, side * -0.6, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
 }
 function drawHead(ctx, b, hx, hy, headR, headCol, snout, t, seed) {
+  if (snout > 6) snout = 6 + (snout - 6) * 0.45;   // 긴 주둥이는 짧게 (더 아기 같게)
   drawEar(ctx, b, hx, hy, headR, 'back');
   // 머리
   ctx.beginPath(); ctx.ellipse(hx, hy, headR, headR * 0.93, 0, 0, Math.PI * 2);
@@ -237,7 +239,7 @@ function drawHead(ctx, b, hx, hy, headR, headCol, snout, t, seed) {
   if (b.pattern === 'husky') { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(hx + headR * 0.4, hy + headR * 0.35, headR * 0.65, headR * 0.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.ellipse(hx + headR * 0.32, hy - headR * 0.45, 3, 2.5, 0, 0, Math.PI * 2); ctx.ellipse(hx - headR * 0.05, hy - headR * 0.45, 3, 2.5, 0, 0, Math.PI * 2); ctx.fill(); }
   if (b.pattern === 'cheek') { ctx.fillStyle = b.belly; ctx.beginPath(); ctx.ellipse(hx + headR * 0.45, hy + headR * 0.45, headR * 0.6, headR * 0.45, 0, 0, Math.PI * 2); ctx.fill(); }
   if (b.pattern === 'spots') for (const [a, c] of fixedDots(seed + 3, 4)) { ctx.fillStyle = b.spot; ctx.beginPath(); ctx.arc(hx - headR * 0.7 + a * headR * 1.2, hy - headR * 0.8 + c * headR * 0.8, 1.8, 0, Math.PI * 2); ctx.fill(); }
-  if (b.wrinkle) { ctx.strokeStyle = shade(headCol, 0.7); ctx.lineWidth = 1.4; for (const dy of [-0.55, -0.35]) { ctx.beginPath(); ctx.arc(hx + headR * 0.2, hy + headR * dy + 6, headR * 0.35, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); } }
+  if (b.wrinkle) { ctx.strokeStyle = shade(headCol, 0.86); ctx.lineWidth = 1.1; for (const dy of [-0.55]) { ctx.beginPath(); ctx.arc(hx + headR * 0.2, hy + headR * dy + 6, headR * 0.35, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); } }
   ctx.restore();
   ctx.lineWidth = 2.4; ctx.strokeStyle = OUT;
 
@@ -253,7 +255,7 @@ function drawHead(ctx, b, hx, hy, headR, headCol, snout, t, seed) {
   const front = hx + headR * 0.55;
   let noseX, noseY;
   if (snout > 0) {
-    const mx = front + snout * 0.45, my = hy + headR * 0.22, rx = headR * 0.28 + snout * 0.55, ry = headR * 0.3;
+    const mx = front + snout * 0.45, my = hy + headR * 0.3, rx = headR * 0.28 + snout * 0.55, ry = headR * 0.27;
     ctx.beginPath(); ctx.ellipse(mx, my, rx, ry, 0.05, 0, Math.PI * 2);
     ctx.fillStyle = b.pattern === 'mask' || b.pattern === 'point' ? b.spot : b.pattern === 'husky' || b.pattern === 'blaze' || b.pattern === 'cheek' ? (b.belly ?? '#fff') : headCol;
     ctx.fill(); ctx.stroke();
@@ -266,25 +268,42 @@ function drawHead(ctx, b, hx, hy, headR, headCol, snout, t, seed) {
     noseX = front + 1; noseY = hy + headR * 0.18;
   }
 
-  // 눈
-  const es = 3.1 * (b.eyeSize ?? 1);
-  const eyes = [[hx + headR * 0.02, hy - headR * 0.12, b.derp ? 0.78 : 1], [hx + headR * 0.5, hy - headR * 0.1, 1]];
-  eyes.forEach(([ex, ey, k], i) => {
-    const r = es * k;
+  // 눈 (11.10 대표님: "조금 징그러워" → 크고 동그란 눈 + 반짝이 두 개, 세로 동공·짝눈 없앰)
+  const es = 4.3 * (b.eyeSize ? 1 + (b.eyeSize - 1) * 0.45 : 1);
+  const eyes = [[hx - headR * 0.12, hy - headR * 0.16], [hx + headR * 0.4, hy - headR * 0.14]];
+  eyes.forEach(([ex, ey], i) => {
+    const r = es * (i === 0 ? 0.92 : 1);   // 뒤쪽 눈이 살짝 작게 (옆에서 본 느낌)
     const iris = b.oddEyes ? b.oddEyes[i] : b.eye;
-    if (b.grumpy) { ctx.fillStyle = OUT; petRR(ctx, ex - r, ey - 1, r * 2, 2.6, 1.3); ctx.fill(); return; }
-    ctx.beginPath(); ctx.arc(ex, ey, r, 0, Math.PI * 2); ctx.fillStyle = iris ?? OUT; ctx.fill();
-    if (iris) { ctx.beginPath(); ctx.ellipse(ex, ey, r * (b.kind === 'cat' ? 0.35 : 0.6), r * 0.85, 0, 0, Math.PI * 2); ctx.fillStyle = OUT; ctx.fill(); }
-    ctx.beginPath(); ctx.arc(ex + r * 0.35, ey - r * 0.4, Math.max(1, r * 0.35), 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
+    if (b.grumpy) {   // 납작한 얼굴 고양이: 기분 좋게 감은 눈
+      ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ex, ey + r * 0.35, r * 0.75, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); ctx.lineWidth = 2.4;
+      return;
+    }
+    ctx.beginPath(); ctx.arc(ex, ey, r, 0, Math.PI * 2); ctx.fillStyle = iris ?? '#2a2420'; ctx.fill();
+    if (iris) { ctx.beginPath(); ctx.arc(ex + r * 0.05, ey + r * 0.12, r * 0.5, 0, Math.PI * 2); ctx.fillStyle = '#2a2420'; ctx.fill(); }   // 동그란 동공
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(ex + r * 0.3, ey - r * 0.35, r * 0.42, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(ex - r * 0.32, ey + r * 0.38, r * 0.17, 0, Math.PI * 2); ctx.fill();
   });
-  if (b.brows) { ctx.fillStyle = b.brows; for (const [ex, ey] of eyes) { ctx.beginPath(); ctx.ellipse(ex, ey - es - 3.5, 2.6, 1.6, 0, 0, Math.PI * 2); ctx.fill(); } }
-  if (b.blush) { ctx.fillStyle = 'rgba(255,120,140,.45)'; ctx.beginPath(); ctx.ellipse(hx + headR * 0.55, hy + headR * 0.32, 3.6, 2.2, 0, 0, Math.PI * 2); ctx.fill(); }
+  if (b.brows) { ctx.fillStyle = b.brows; for (const [ex, ey] of eyes) { ctx.beginPath(); ctx.ellipse(ex, ey - es - 3.2, 2.6, 1.6, 0, 0, Math.PI * 2); ctx.fill(); } }
+  // 볼 터치 (모두)
+  ctx.fillStyle = b.blush ? 'rgba(255,120,140,.5)' : 'rgba(255,130,150,.32)';
+  ctx.beginPath(); ctx.ellipse(hx + headR * 0.6, hy + headR * 0.4, 4, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(hx - headR * 0.12, hy + headR * 0.38, 3, 2, 0, 0, Math.PI * 2); ctx.fill();
 
   // 코, 입, 혀, 수염
   ctx.fillStyle = b.kind === 'cat' ? (b.hairless ? '#C97F7F' : '#E58A8A') : OUT;
-  ctx.beginPath(); ctx.ellipse(noseX, noseY, b.kind === 'cat' ? 2.2 : 3, b.kind === 'cat' ? 1.7 : 2.3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(noseX, noseY, b.kind === 'cat' ? 2.2 : 2.9, b.kind === 'cat' ? 1.7 : 2.2, 0, 0, Math.PI * 2); ctx.fill();
+  if (b.kind !== 'cat') { ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.beginPath(); ctx.arc(noseX + 0.8, noseY - 0.8, 0.9, 0, Math.PI * 2); ctx.fill(); }
   ctx.lineWidth = 1.5; ctx.strokeStyle = OUT;
-  ctx.beginPath(); ctx.moveTo(noseX - 1, noseY + 2); ctx.quadraticCurveTo(noseX - 3, noseY + 5, noseX - 6, noseY + 4); ctx.stroke();
+  // 입: 고양이는 ω, 강아지는 작은 웃음
+  if (b.kind === 'cat') {
+    const my = noseY + 1.6, r = 1.8;
+    ctx.beginPath(); ctx.moveTo(noseX - 1.2, noseY + 1); ctx.lineTo(noseX - 1.2, my);   // 코 밑 짧은 선
+    ctx.moveTo(noseX - 1.2, my); ctx.arc(noseX - 1.2 - r, my, r, 0, Math.PI * 0.9);
+    ctx.moveTo(noseX - 1.2 + r * 2, my); ctx.arc(noseX - 1.2 + r, my, r, 0, Math.PI);
+    ctx.stroke();
+  }
+  else { ctx.beginPath(); ctx.moveTo(noseX - 1, noseY + 2); ctx.quadraticCurveTo(noseX - 2.5, noseY + 5.5, noseX - 6, noseY + 4.2); ctx.stroke(); }
   if (b.tongue) {
     const tl = 5 + Math.sin(t * 6 + seed) * 1.2;
     petRR(ctx, noseX - 6, noseY + 3, 4.6, tl, 2.3); ctx.fillStyle = '#F07A92'; ctx.fill(); ctx.lineWidth = 1.2; ctx.stroke();
