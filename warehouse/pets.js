@@ -301,20 +301,25 @@ function drawHead(ctx, b, hx, hy, headR, headCol, snout, t, seed) {
   }
 
   // 눈 (11.10 대표님: "조금 징그러워" → 크고 동그란 눈 + 반짝이 두 개, 세로 동공·짝눈 없앰)
-  const es = 4.3 * (b.eyeSize ? 1 + (b.eyeSize - 1) * 0.45 : 1);
-  const eyes = [[hx - headR * 0.12, hy - headR * 0.16], [hx + headR * 0.4, hy - headR * 0.14]];
+  // 11.10 두 번째: 크고 반짝이 많은 눈도 "징그러워" → 세로로 살짝 긴 콩 눈 + 작은 반짝이 하나, 두 눈 사이를 벌림
+  const es = 3 * (b.eyeSize ? 1 + (b.eyeSize - 1) * 0.4 : 1);
+  const eyes = [[hx - headR * 0.2, hy - headR * 0.08], [hx + headR * 0.36, hy - headR * 0.06]];
+  const hc = parseInt((headCol.startsWith('#') ? headCol : '#888888').slice(1), 16);
+  const darkFace = (0.3 * (hc >> 16) + 0.59 * ((hc >> 8) & 255) + 0.11 * (hc & 255)) < 90;   // 까만 얼굴이면 눈을 밝게
   eyes.forEach(([ex, ey], i) => {
     const r = es * (i === 0 ? 0.92 : 1);   // 뒤쪽 눈이 살짝 작게 (옆에서 본 느낌)
     const iris = b.oddEyes ? b.oddEyes[i] : b.eye;
     if (b.grumpy) {   // 납작한 얼굴 고양이: 기분 좋게 감은 눈
-      ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ex, ey + r * 0.35, r * 0.75, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); ctx.lineWidth = 2.4;
+      ctx.strokeStyle = OUT; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(ex, ey + r * 0.35, Math.max(3, r * 0.8), Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); ctx.lineWidth = 2.4;
       return;
     }
-    ctx.beginPath(); ctx.arc(ex, ey, r, 0, Math.PI * 2); ctx.fillStyle = iris ?? '#2a2420'; ctx.fill();
-    if (iris) { ctx.beginPath(); ctx.arc(ex + r * 0.05, ey + r * 0.12, r * 0.5, 0, Math.PI * 2); ctx.fillStyle = '#2a2420'; ctx.fill(); }   // 동그란 동공
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(ex + r * 0.3, ey - r * 0.35, r * 0.42, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(ex - r * 0.32, ey + r * 0.38, r * 0.17, 0, Math.PI * 2); ctx.fill();
+    if (darkFace) {   // 까만 얼굴: 눈 색(없으면 연한 노랑) 콩 눈 + 작은 동공 + 반짝이
+      ctx.beginPath(); ctx.ellipse(ex, ey, r * 0.85, r * 1.05, 0, 0, Math.PI * 2); ctx.fillStyle = iris ?? '#F3D27A'; ctx.fill();
+      ctx.beginPath(); ctx.ellipse(ex + r * 0.05, ey + r * 0.1, r * 0.48, r * 0.7, 0, 0, Math.PI * 2); ctx.fillStyle = '#1d1a18'; ctx.fill();
+    } else {   // 콩 눈: 눈 색이 있으면 그 색을 아주 진하게 (파란 눈 → 짙은 남색), 없으면 진한 갈색
+      ctx.beginPath(); ctx.ellipse(ex, ey, r * 0.78, r, 0, 0, Math.PI * 2); ctx.fillStyle = iris ? shade(iris, 0.42) : '#2a2420'; ctx.fill();
+    }
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex + r * 0.22, ey - r * 0.38, Math.max(0.9, r * 0.3), 0, Math.PI * 2); ctx.fill();
   });
   if (b.brows) { ctx.fillStyle = b.brows; for (const [ex, ey] of eyes) { ctx.beginPath(); ctx.ellipse(ex, ey - es - 3.2, 2.6, 1.6, 0, 0, Math.PI * 2); ctx.fill(); } }
   if (b.bangs) {   // 삽살개: 눈 위를 살짝 덮는 앞머리 (눈 아래쪽은 보이게)
