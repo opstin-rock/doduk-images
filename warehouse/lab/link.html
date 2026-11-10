@@ -679,7 +679,7 @@
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(refit);
   setTimeout(refit, 300); setTimeout(refit, 1200);
   requestAnimationFrame(frame);
-  window.__link = { findPath, findMove, get grid() { return grid; }, match, remaining, frame, get stage() { return stage; }, get score() { return score; }, layout, setDeadline: (ms) => { deadline = performance.now() + ms; } };   // 시험용
+  window.__link = { findPath, findMove, get grid() { return grid; }, match, remaining, frame, get stage() { return stage; }, get score() { return score; }, get geo() { return { ts, th, m, W, H }; }, layout, setDeadline: (ms) => { deadline = performance.now() + ms; } };   // 시험용
 })();
 </script>
 </body>
