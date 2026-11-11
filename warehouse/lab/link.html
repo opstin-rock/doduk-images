@@ -104,15 +104,15 @@
 <div class="modal open" id="startBox"><div class="box rules">
   <a class="back" href="arcade.html?v=1">← 오락실</a>
   <h2>사천성 하는 법</h2>
+  <p class="muted">한 단계가 한 판이야. 한 판 끝내면 보호소에 보낼 <b>간식 한 알</b> (짝 5개 이상, 하루 20알까지). 300알 모이면 간식 1개를 보내</p>
   <ol>
     <li><b>같은 아이 두 마리</b>를 차례로 눌러서 없애</li>
     <li>둘 사이를 <b>꺾이는 곳 두 번 이하</b>인 선으로 이을 수 있어야 해. 판 바깥으로 돌아가도 돼</li>
     <li><b>시간 안에</b> 판을 다 비우면 다음 단계. 짝 하나 없앨 때마다 1초씩 늘어나</li>
     <li>2단계부터는 짝을 없앨 때마다 남은 아이들이 <b>한쪽으로 쏠려</b></li>
     <li><b>택배 상자</b>는 못 없애고 길을 막아. 돌아서 이어</li>
-    <li>2.5초 안에 다음 짝을 찾으면 <b>연속 보너스</b></li>
+    <li>2.5초 안에 다음 짝을 찾으면 <b>연속 보너스</b>. 막히면 힌트·섞기를 써</li>
   </ol>
-  <p class="muted">한 단계를 끝낼 때마다 보호소에 보낼 <b>간식 한 알</b>이 쌓여 (하루 20알까지, 300알 모이면 간식 1개를 보내). 막히면 힌트·섞기를 써</p>
   <button class="main" id="startBtn">시작</button>
 </div></div>
 
@@ -159,7 +159,7 @@
 <script src="haptic.js?v=1"></script>
 <script src="sfx.js?v=1"></script>
 <script src="../config.js?v=26"></script>
-<script src="score.js?v=5"></script>
+<script src="score.js?v=6"></script>
 <script>if (location.search.includes('embed')) document.documentElement.classList.add('embed');</script>
 <script>
 (() => {
@@ -214,7 +214,7 @@
   const BOX = -1;   // 방해 상자
 
   // ---------- 판 ----------
-  let grid, sel, hint, pathFx, pops, moving = [], score, combo, lastMatch, hintsLeft, shufflesLeft, running;
+  let grid, sel, hint, pathFx, pops, moving = [], score = 0, combo, lastMatch, hintsLeft = 3, shufflesLeft = 1, running;   // 시작 전에도 버튼 글자가 "힌트 3"으로 (예전엔 undefined)
   let stage = 1, deadline = 0, pausedLeft = null;
   const empty = (r, c) => r < 0 || c < 0 || r > ROWS + 1 || c > COLS + 1 ? false : grid[r][c] === null;
   function newGrid() {
@@ -355,7 +355,7 @@
   let stagePairs = 0, kibbleDone = false;
   function giveKibble() { if (kibbleDone) return Promise.resolve(undefined); kibbleDone = true; Score.gameDone(); return Score.kibble('sacheon'); }
   function kibbleIfPlayed() { return running && stagePairs >= 5 ? giveKibble() : Promise.resolve(undefined); }
-  const kibbleText = (r) => r === undefined ? '짝 5개 이상 없애면 한 알' : r && r.ok ? `+1 (오늘 ${r.today}/20)` : r && r.reason === 'cap' ? '오늘 20알 다 모았어' : '나중에 다시 보낼게';
+  const kibbleText = (r) => r === undefined ? '짝 5개 이상 없애면 한 알' : r && r.ok ? `+1 (오늘 ${r.today}/20)` : r && r.reason === 'cap' ? '오늘 20알 다 모았어' : r && (r.reason === 'ipcap' || r.reason === 'daycap') ? '오늘은 여기까지 받을 수 있어' : '나중에 다시 보낼게';
   function showKibble(id, promise) { promise.then((r) => { const el = document.getElementById(id); if (el) el.textContent = kibbleText(r); if (r && r.ok) Sfx.kibble(); }); }
   function clearStage() {
     running = false;
@@ -420,7 +420,12 @@
     if (!running || shufflesLeft <= 0) return;
     reshuffle(); shufflesLeft--; sel = null; hint = null; Sfx.shuffle(); toast('섞었어'); updateHud();
   };
-  document.getElementById('restartBtn').onclick = () => { sendGained(); kibbleIfPlayed(); start(); };
+  // 다시: 게임 중이면 한 번 더 눌러야 처음부터 (실수로 눌러서 판이 날아가지 않게)
+  let restartArm = 0;
+  document.getElementById('restartBtn').onclick = () => {
+    if (running && score > 0 && Date.now() - restartArm > 2000) { restartArm = Date.now(); toast('한 번 더 누르면 처음부터'); return; }
+    restartArm = 0; sendGained(); kibbleIfPlayed(); start();
+  };
   const vibeBtn = document.getElementById('vibeBtn');
   const vibeLabel = () => { vibeBtn.textContent = Haptic.on ? '진동 켬' : '진동 끔'; vibeBtn.classList.toggle('off', !Haptic.on); };
   vibeBtn.onclick = () => { Haptic.toggle(); vibeLabel(); toast(Haptic.on ? '진동 켰어' : '진동 껐어'); };
