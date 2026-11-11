@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>똥피하기</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700&display=swap">
+<style>
+  :root { --ink:#1f1f22; --cream:#fbf6ec; --yellow:#ffd54a; --red:#e8402f; --line:#2a2420; --muted:#6b6560; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; background:var(--cream); color:var(--ink); font-family:"Noto Sans KR",sans-serif; -webkit-text-size-adjust:100%; text-size-adjust:100%; overscroll-behavior:none; }
+  html, body { height:100%; }
+  body { height:100vh; height:var(--vh, 100dvh); overflow:hidden; }
+  .wrap { max-width:480px; margin:0 auto; padding:6px 8px 8px; height:100%; display:flex; flex-direction:column; }
+  .stage { flex:1 1 auto; min-height:0; display:flex; align-items:stretch; justify-content:center; touch-action:none; }
+  .hud { display:flex; gap:5px; padding:0 2px 6px; }
+  .stat { flex:1; background:#fff; border:2px solid var(--line); border-radius:10px; padding:2px 0 3px; text-align:center; line-height:1.15; }
+  .stat b { display:block; font-family:"Jua",sans-serif; font-size:18px; font-weight:400; }
+  .stat span { font-size:10px; color:var(--muted); }
+  .stat .hearts { color:var(--red); letter-spacing:1px; }
+  canvas { display:block; border:2px solid var(--line); border-radius:14px; touch-action:none; }
+  .tools { display:flex; gap:6px; padding:6px 2px 0; }
+  button { font-family:"Jua",sans-serif; font-size:16px; border:2px solid var(--line); border-radius:12px; background:#fff; color:var(--ink); padding:8px 0; flex:1; cursor:pointer; }
+  .box button { padding:12px 0; font-size:17px; }
+  button.main { background:var(--line); color:#fff; }
+  .tools .small { flex:0 0 58px; font-size:14px; padding-left:0; padding-right:0; }
+  .tools .off { color:var(--muted); }
+  .toast { position:fixed; left:50%; top:38%; transform:translate(-50%,-50%); background:rgba(31,31,34,.86); color:#fff; font-family:"Jua",sans-serif; font-size:22px; padding:10px 18px; border-radius:14px; pointer-events:none; opacity:0; transition:opacity .2s; z-index:6;
+          width:max-content; max-width:88vw; text-align:center; line-height:1.35; word-break:keep-all; }
+  .toast.on { opacity:1; }
+  .modal { position:fixed; left:0; right:0; top:0; height:100vh; height:var(--vh, 100dvh); background:rgba(20,18,16,.55); display:none; align-items:center; justify-content:center; padding:12px; z-index:7; }
+  .modal.open { display:flex; }
+  .box { background:var(--cream); border:3px solid var(--line); border-radius:18px; padding:20px 16px 0; width:100%; max-width:360px; text-align:center;
+         max-height:calc(var(--vh, 100dvh) - 24px); overflow-y:auto; -webkit-overflow-scrolling:touch; word-break:keep-all; overflow-wrap:break-word; }
+  .box > button.main { position:sticky; bottom:0; margin:12px 0 0; box-shadow:0 -10px 12px var(--cream), 0 14px 0 var(--cream); }
+  .box > *:last-child { margin-bottom:14px; }
+  .box h2 { font-family:"Jua",sans-serif; font-weight:400; font-size:28px; margin:0 0 10px; }
+  .box p { font-size:14px; line-height:1.65; margin:0 0 8px; }
+  .box .big { font-family:"Jua",sans-serif; font-size:44px; margin:6px 0 2px; }
+  .box .muted { color:var(--muted); font-size:12px; }
+  .box button { margin-top:12px; width:100%; }
+  .sum { background:#fff; border:2px solid var(--line); border-radius:12px; padding:8px 12px; margin:4px 0 6px; text-align:left; }
+  .sum div { display:flex; justify-content:space-between; gap:10px; font-size:14px; line-height:1.9; }
+  .sum div b { font-family:"Jua",sans-serif; font-weight:400; font-size:16px; white-space:nowrap; }
+  .sum .total { border-top:1px dashed #c9bfae; margin-top:2px; padding-top:2px; }
+  .rules { text-align:left; padding:18px 16px 0; }
+  .rules h2 { text-align:center; font-size:24px; }
+  .rules ol { margin:0 0 6px; padding-left:20px; font-size:14px; line-height:1.6; }
+  .rules li { margin-bottom:5px; }
+  .embed .back { display:none; }
+  .back { display:inline-block; font-size:13px; color:var(--muted); text-decoration:none; margin-bottom:4px; }
+  .hud .pausebtn { flex:0 0 46px; padding:2px 0 3px; font-size:10px; line-height:1.15; border-radius:10px; color:var(--muted); }
+  .hud .pausebtn b { display:block; font-size:17px; color:var(--ink); letter-spacing:1px; }
+  #pauseBox { background:rgba(42,36,32,.9); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); z-index:8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hud">
+    <div class="stat"><b id="time">0.0</b><span>버틴 시간</span></div>
+    <div class="stat"><b id="score">0</b><span>점수</span></div>
+    <div class="stat"><b id="lives" class="hearts">♥♥♥</b><span>목숨</span></div>
+    <div class="stat"><b id="level">1</b><span>단계</span></div>
+    <button class="pausebtn" id="pauseBtn" type="button"><b>II</b>멈춤</button>
+  </div>
+  <div class="stage" id="stage"><canvas id="board"></canvas></div>
+  <div class="tools">
+    <button id="restartBtn">다시</button>
+    <button id="soundBtn" class="small">소리 켬</button>
+    <button id="vibeBtn" class="small">진동 켬</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<div class="modal open" id="startBox"><div class="box rules">
+  <a class="back" href="arcade.html?v=1">← 오락실</a>
+  <h2>똥피하기 하는 법</h2>
+  <p class="muted">20초 넘게 버티면 보호소에 보낼 <b>간식 한 알</b> (하루 20알까지). 300알 모이면 간식 1개를 보내</p>
+  <ol>
+    <li>위에서 <b>똥</b>이 떨어져. 화면을 누른 채 <b>좌우로 밀어서</b> 피해 (키보드는 화살표)</li>
+    <li>목숨은 <b>3개</b>. 맞으면 하나 줄고 잠깐 반짝이는 동안은 안 맞아</li>
+    <li>오래 버틸수록 점수가 올라. 똥이 <b>아슬아슬하게</b> 스치면 보너스</li>
+    <li><b>뼈다귀</b>를 주우면 점수, <b>빗자루</b>를 주우면 화면의 똥이 싹 치워져</li>
+    <li>15초마다 한 단계씩 <b>빨라져</b></li>
+  </ol>
+  <button class="main" id="startBtn">시작</button>
+</div></div>
+
+<div class="modal" id="endBox"><div class="box">
+  <h2 id="endTitle">똥 맞았다</h2>
+  <div class="big" id="endScore">0점</div>
+  <p id="endDetail"></p>
+  <p class="muted" id="endBest"></p>
+  <div class="sum" id="endEveryone"></div>
+  <div id="endBoard"></div>
+  <button class="main" id="againBtn">한 판 더</button>
+</div></div>
+
+<div class="modal" id="pauseBox"><div class="box">
+  <h2>잠깐 멈춤</h2>
+  <p>떨어지던 똥도 멈췄어</p>
+  <button class="main" id="resumeBtn">계속하기</button>
+</div></div>
+
+<div id="err" style="display:none;position:fixed;left:0;right:0;bottom:0;background:#e8402f;color:#fff;font-size:12px;padding:6px 10px;z-index:9"></div>
+<script>
+  if (window.CanvasRenderingContext2D && !CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+      r = Math.max(0, Math.min(typeof r === 'number' ? r : (r && r[0]) || 0, Math.abs(w) / 2, Math.abs(h) / 2));
+      this.moveTo(x + r, y); this.lineTo(x + w - r, y); this.arcTo(x + w, y, x + w, y + r, r);
+      this.lineTo(x + w, y + h - r); this.arcTo(x + w, y + h, x + w - r, y + h, r);
+      this.lineTo(x + r, y + h); this.arcTo(x, y + h, x, y + h - r, r);
+      this.lineTo(x, y + r); this.arcTo(x, y, x + r, y, r); this.closePath();
+    };
+  }
+  window.addEventListener('error', (e) => { const el = document.getElementById('err'); el.style.display = 'block'; el.textContent = '오류: ' + (e.message || e.type); });
+</script>
+<script src="../pets.js?v=39"></script>
+<script src="haptic.js?v=1"></script>
+<script src="sfx.js?v=1"></script>
+<script src="../config.js?v=26"></script>
+<script src="score.js?v=8"></script>
+<script>if (location.search.includes('embed')) document.documentElement.classList.add('embed');</script>
+<script>
+// 똥피하기 (11.11 대표님): 위에서 떨어지는 똥을 좌우로 피함. 내 캐릭터(오락실에서 고른 품종·소품·옷)로 플레이
+(() => {
+  // ---------- 화면 ----------
+  function setVH() { const h = window.visualViewport ? window.visualViewport.height : window.innerHeight; if (h > 200) document.documentElement.style.setProperty('--vh', `${Math.round(h)}px`); }
+  setVH(); addEventListener('resize', setVH); if (window.visualViewport) visualViewport.addEventListener('resize', setVH);
+  const stageEl = document.getElementById('stage'), cv = document.getElementById('board'), g = cv.getContext('2d');
+  const WW = 360;   // 세상 가로 폭 (세로는 화면 비율에 맞춰)
+  let k = 1, WH = 560, dpr = 1, cssW = 0, cssH = 0;
+  function layout() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.style.width = '0px'; cv.style.height = '0px';
+    cssW = Math.min(stageEl.clientWidth, 480); cssH = Math.max(300, stageEl.clientHeight);
+    cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssH * dpr); cv.style.width = cssW + 'px'; cv.style.height = cssH + 'px';
+    k = cssW / WW; WH = cssH / k;
+  }
+  layout(); addEventListener('resize', () => { layout(); });
+
+  // ---------- 내 캐릭터 (오락실 설정 그대로) ----------
+  const ls = (key, d) => { try { const v = localStorage.getItem(key); return v === null ? d : v; } catch { return d; } };
+  const bs = ls('doduk-breed', ''); let breed = bs === '' ? NaN : Number(bs); if (!Number.isInteger(breed) || !BREEDS[breed]) breed = Math.floor(Math.random() * BREEDS.length);
+  const acc = ACCESSORIES.some((a) => a.id === ls('doduk-acc', '')) ? ls('doduk-acc', '') : '';
+  const wear = WEARS.some((a) => a.id === ls('doduk-wear', '')) ? ls('doduk-wear', '') : '';
+  // 키를 70쯤으로 맞춤 (큰 품종도 같은 크기로: 공정하게)
+  const measure = document.createElement('canvas').getContext('2d');
+  const petTop = -drawPet(measure, { breed, acc: '', wear, x: 0, y: 0, tx: 0, ty: 0, face: 1, noTag: true }, 0, false);
+  const PK = 70 / petTop, PH = 70, BWK = Math.max(1, (specOf(BREEDS[breed]).bw || 1) * 0.9);   // 몸이 긴 품종(닥스훈트·코기)은 몸 범위를 옆으로 넓게
+
+  // ---------- 상태 ----------
+  let running = false, paused = false, over = false, started = false;
+  let px = WW / 2, vx = 0, face = 1, targetX = null, keyDir = 0;
+  let poops = [], items = [], parts = [], floats = [], splats = [];
+  let time = 0, score = 0, lives = 3, level = 1, invUntil = 0, nextPoop = 0, nextItem = 4, shakeT = 0, hitFlash = 0, dodged = 0, nearMiss = 0, bones = 0;
+  const FLOOR = () => WH - 40;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
+  // ---------- 조작: 누른 채 좌우로 (손가락 위치를 따라감, 최고 속도 제한) ----------
+  const toX = (clientX) => { const r = cv.getBoundingClientRect(); return ((clientX - r.left) / r.width) * WW; };
+  let lastSrc = { t: 0, s: '' };
+  const down = (x, s) => { if (s !== lastSrc.s && performance.now() - lastSrc.t < 400) return; lastSrc = { t: performance.now(), s }; targetX = x; };
+  const move = (x) => { if (targetX !== null) targetX = x; };
+  let activeId = null;
+  const up = (e) => { if (e && e.pointerId !== undefined && activeId !== null && e.pointerId !== activeId) return; activeId = null; targetX = null; };
+  if (window.PointerEvent) {
+    stageEl.addEventListener('pointerdown', (e) => { e.preventDefault(); activeId = e.pointerId; down(toX(e.clientX), 'p'); try { stageEl.setPointerCapture(e.pointerId); } catch {} });
+    stageEl.addEventListener('pointermove', (e) => { if (activeId === null || e.pointerId === activeId) move(toX(e.clientX)); });
+    addEventListener('pointerup', up); addEventListener('pointercancel', up);
+  } else {
+    stageEl.addEventListener('touchstart', (e) => { e.preventDefault(); down(toX(e.changedTouches[0].clientX), 't'); }, { passive: false });
+    stageEl.addEventListener('touchmove', (e) => { e.preventDefault(); move(toX(e.changedTouches[0].clientX)); }, { passive: false });
+    addEventListener('touchend', () => up()); addEventListener('touchcancel', () => up());
+    stageEl.addEventListener('mousedown', (e) => down(toX(e.clientX), 'm')); addEventListener('mousemove', (e) => move(toX(e.clientX))); addEventListener('mouseup', up);
+  }
+  addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') keyDir = -1; if (e.key === 'ArrowRight') keyDir = 1; });
+  addEventListener('keyup', (e) => { if ((e.key === 'ArrowLeft' && keyDir < 0) || (e.key === 'ArrowRight' && keyDir > 0)) keyDir = 0; });
+
+  // ---------- 난이도 (15초마다 한 단계) ----------
+  const diff = () => {
+    const L = level;
+    return { gap: Math.max(0.2, 0.78 - L * 0.07), speed: 150 + L * 32, bigChance: L >= 3 ? 0.15 + L * 0.02 : 0, swayChance: L >= 4 ? 0.2 : 0, multi: L >= 5 ? 0.25 : 0 };
+  };
+  function spawnPoop() {
+    const d = diff(), big = Math.random() < d.bigChance, r = big ? 19 : 13;
+    poops.push({ x: rnd(r + 4, WW - r - 4), y: -r - 10, vy: d.speed * rnd(0.85, 1.2), r, sway: Math.random() < d.swayChance ? rnd(30, 60) : 0, ph: rnd(0, 6), rot: rnd(-0.3, 0.3), near: false });
+  }
+  function spawnItem() {
+    const broom = time > 20 && Math.random() < 0.3;
+    items.push({ kind: broom ? 'broom' : 'bone', x: rnd(24, WW - 24), y: -20, vy: 120 + level * 10, ph: rnd(0, 6) });
+  }
+
+  // ---------- 그리기 ----------
+  const OUTC = '#3b2b25';
+  function drawPoop(x, y, r, rot, t) {   // 세 층 소용돌이 똥 + 작은 눈
+    g.save(); g.translate(x, y); g.rotate(rot); g.lineWidth = 2; g.strokeStyle = OUTC;
+    const layer = (cy, w, h, col) => { g.beginPath(); g.ellipse(0, cy, w, h, 0, 0, Math.PI * 2); g.fillStyle = col; g.fill(); g.stroke(); };
+    layer(r * 0.45, r, r * 0.45, '#8B5A2B'); layer(0, r * 0.75, r * 0.38, '#9C6634'); layer(-r * 0.42, r * 0.5, r * 0.3, '#A9713C');
+    g.beginPath(); g.moveTo(-r * 0.1, -r * 0.65); g.quadraticCurveTo(r * 0.1, -r * 1.05, r * 0.25, -r * 0.95); g.stroke();
+    g.fillStyle = '#fff'; for (const s of [-1, 1]) { g.beginPath(); g.arc(s * r * 0.3, r * 0.05, r * 0.16, 0, Math.PI * 2); g.fill(); }
+    g.fillStyle = OUTC; for (const s of [-1, 1]) { g.beginPath(); g.arc(s * r * 0.3 + Math.sin(t * 3) * r * 0.03, r * 0.08, r * 0.08, 0, Math.PI * 2); g.fill(); }
+    g.restore();
+  }
+  function drawBone(x, y, t) {
+    g.save(); g.translate(x, y); g.rotate(Math.sin(t * 4) * 0.3); g.fillStyle = '#FFF2D6'; g.strokeStyle = OUTC; g.lineWidth = 2;
+    g.beginPath(); g.roundRect(-11, -4, 22, 8, 3); g.fill(); g.stroke();
+    for (const [dx, dy] of [[-11, -4], [-11, 4], [11, -4], [11, 4]]) { g.beginPath(); g.arc(dx, dy, 4.5, 0, Math.PI * 2); g.fill(); g.stroke(); }
+    g.beginPath(); g.roundRect(-10, -3, 20, 6, 2); g.fill();
+    g.restore();
+  }
+  function drawBroom(x, y, t) {
+    g.save(); g.translate(x, y); g.rotate(-0.5 + Math.sin(t * 5) * 0.15); g.strokeStyle = OUTC; g.lineWidth = 2;
+    g.fillStyle = '#C98A47'; g.beginPath(); g.roundRect(-2, -26, 4, 26, 2); g.fill(); g.stroke();
+    g.fillStyle = '#F2C14E'; g.beginPath(); g.moveTo(-6, 0); g.lineTo(6, 0); g.lineTo(11, 16); g.lineTo(-11, 16); g.closePath(); g.fill(); g.stroke();
+    g.strokeStyle = 'rgba(59,43,37,.5)'; g.lineWidth = 1; for (const dx of [-6, -2, 2, 6]) { g.beginPath(); g.moveTo(dx * 0.6, 2); g.lineTo(dx, 15); g.stroke(); }
+    g.restore();
+  }
+  function drawScene(t) {
+    g.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
+    let sx = 0, sy = 0; if (shakeT > 0) { sx = rnd(-4, 4) * shakeT * 3; sy = rnd(-3, 3) * shakeT * 3; }
+    g.translate(sx, sy);
+    // 하늘 + 창고 바닥
+    const sky = g.createLinearGradient(0, 0, 0, WH); sky.addColorStop(0, '#CFE8F7'); sky.addColorStop(1, '#FBF6EC'); g.fillStyle = sky; g.fillRect(-10, -10, WW + 20, WH + 20);
+    g.fillStyle = 'rgba(255,255,255,.7)'; for (const [cx, cy, s] of [[60, 70, 1], [250, 120, 0.8], [180, 40, 0.6]]) { g.beginPath(); g.ellipse(cx + Math.sin(t * 0.2 + cx) * 10, cy, 30 * s, 12 * s, 0, 0, Math.PI * 2); g.ellipse(cx + 18 * s + Math.sin(t * 0.2 + cx) * 10, cy - 8 * s, 20 * s, 12 * s, 0, 0, Math.PI * 2); g.fill(); }
+    const fy = FLOOR();
+    g.fillStyle = '#D9B98C'; g.fillRect(-10, fy, WW + 20, WH - fy + 10);
+    g.strokeStyle = '#C49E6B'; g.lineWidth = 2; for (let x = 0; x < WW + 40; x += 48) { g.beginPath(); g.moveTo(x, fy); g.lineTo(x - 10, WH + 10); g.stroke(); }
+    g.fillStyle = '#B98D57'; g.fillRect(-10, fy, WW + 20, 5);
+    // 바닥에 떨어진 똥 자국
+    for (const s of splats) { g.globalAlpha = Math.max(0, s.life); g.fillStyle = '#8B5A2B'; g.beginPath(); g.ellipse(s.x, fy + 4, s.r * 1.2, s.r * 0.35, 0, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; }
+    for (const it of items) it.kind === 'bone' ? drawBone(it.x, it.y, t + it.ph) : drawBroom(it.x, it.y, t + it.ph);
+    // 내 캐릭터 (맞은 뒤 무적일 때 깜빡)
+    const inv = time < invUntil;
+    if (!inv || Math.floor(t * 12) % 2) {
+      g.save(); g.translate(px, fy + 2); g.scale(PK, PK);
+      const moving = Math.abs(vx) > 20;
+      drawPet(g, { breed, acc, wear, x: 0, y: 0, tx: moving ? Math.sign(vx) * 10 : 0, ty: 0, face, noTag: true, act: over ? { a: 'sleep' } : null }, t, false);
+      g.restore();
+    }
+    for (const p of poops) drawPoop(p.x, p.y, p.r, p.rot, t + p.ph);
+    for (const p of parts) { g.globalAlpha = Math.max(0, p.life); g.fillStyle = p.col; g.beginPath(); g.arc(p.x, p.y, p.s, 0, Math.PI * 2); g.fill(); }
+    g.globalAlpha = 1;
+    g.textAlign = 'center'; g.lineJoin = 'round';
+    for (const f of floats) { g.globalAlpha = Math.max(0, f.life); g.font = `${f.size}px Jua`; g.lineWidth = 4; g.strokeStyle = '#fff'; g.strokeText(f.text, f.x, f.y); g.fillStyle = f.col; g.fillText(f.text, f.x, f.y); }
+    g.globalAlpha = 1;
+    if (hitFlash > 0) { g.fillStyle = `rgba(232,64,47,${hitFlash * 0.35})`; g.fillRect(-10, -10, WW + 20, WH + 20); }
+  }
+
+  // ---------- 진행 ----------
+  const hitHead = () => ({ x: px, y: FLOOR() - PH * 0.6, r: PH * 0.29 }), hitBody = () => ({ x: px, y: FLOOR() - PH * 0.2, r: PH * 0.24 * BWK });
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  function burst(x, y, col, n, sp) { for (let i = 0; i < n; i++) { const a = rnd(0, Math.PI * 2), v = rnd(40, sp); parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, s: rnd(1.5, 3.5), col, life: 1 }); } }
+  const float = (text, x, y, col = '#E8402F', size = 20) => floats.push({ text, x, y, col, size, life: 1 });
+  function step(dt) {
+    if (!running) return;
+    time += dt;
+    const nl = Math.min(12, 1 + Math.floor(time / 15));
+    if (nl > level) { level = nl; toast(`${level}단계, 빨라졌어`); Sfx.bonus(); Haptic.combo(3); }
+    // 이동
+    let want = 0;
+    if (targetX !== null) { const d = targetX - px; want = Math.abs(d) < 3 ? 0 : Math.sign(d) * Math.min(1, Math.abs(d) / 40); }
+    else want = keyDir;
+    const MAXV = 330;
+    vx += (want * MAXV - vx) * Math.min(1, dt * 14);
+    px = Math.max(18, Math.min(WW - 18, px + vx * dt));
+    if (Math.abs(vx) > 20) face = Math.sign(vx);
+    // 떨어지는 것
+    nextPoop -= dt;
+    if (nextPoop <= 0) { const d = diff(); spawnPoop(); if (Math.random() < d.multi) spawnPoop(); nextPoop = d.gap * rnd(0.75, 1.25); }
+    nextItem -= dt; if (nextItem <= 0) { spawnItem(); nextItem = rnd(6, 10); }
+    const H = hitHead(), B = hitBody(), fy = FLOOR();
+    for (let i = poops.length - 1; i >= 0; i--) {
+      const p = poops[i]; p.y += p.vy * dt; p.ph += dt; if (p.sway) p.x = Math.max(p.r, Math.min(WW - p.r, p.x + Math.cos(p.ph * 3) * p.sway * dt));
+      const hr = p.r * 0.75;
+      const dh = dist(p, H) - H.r - hr, db = dist(p, B) - B.r - hr;
+      if ((dh < 0 || db < 0) && time >= invUntil) { poops.splice(i, 1); hit(p); continue; }
+      if (!p.near && Math.min(dh, db) < 10 && Math.min(dh, db) >= 0 && p.y > H.y - 10) { p.near = true; }
+      if (p.y > fy - p.r * 0.3) {
+        poops.splice(i, 1); dodged++; score += 5;
+        splats.push({ x: p.x, r: p.r, life: 1 }); burst(p.x, fy, '#8B5A2B', 4, 90);
+        if (p.near) { nearMiss++; score += 15; float('아슬아슬 +15', p.x, fy - 70, '#FF8A3D', 18); Sfx.select(); Haptic.combo(1); }
+      }
+    }
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i]; it.y += it.vy * dt;
+      if (dist(it, B) < B.r + 16 || dist(it, H) < H.r + 16) {
+        items.splice(i, 1);
+        if (it.kind === 'bone') { bones++; score += 30; float('뼈다귀 +30', it.x, it.y - 10, '#C98A47', 20); burst(it.x, it.y, '#FFE0B8', 10, 140); Sfx.bonus(); Haptic.combo(2); }
+        else { const n = poops.length; for (const p of poops) burst(p.x, p.y, '#A9713C', 5, 120); score += n * 10; poops = []; float(`싹 치움 +${n * 10}`, WW / 2, WH * 0.4, '#3D7BD9', 26); Sfx.shuffle(); Haptic.big(); }
+        continue;
+      }
+      if (it.y > fy) items.splice(i, 1);
+    }
+    score += dt * 10;
+    for (const s of splats) s.life -= dt * 0.6; splats = splats.filter((s) => s.life > 0);
+    for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 400 * dt; p.life -= dt * 1.6; } parts = parts.filter((p) => p.life > 0);
+    for (const f of floats) { f.y -= 40 * dt; f.life -= dt * 0.9; } floats = floats.filter((f) => f.life > 0);
+    shakeT = Math.max(0, shakeT - dt); hitFlash = Math.max(0, hitFlash - dt * 2);
+    updateHud();
+  }
+  function hit(p) {
+    lives--; invUntil = time + 1.3; shakeT = 0.3; hitFlash = 1;
+    burst(px, FLOOR() - PH * 0.5, '#8B5A2B', 14, 180);
+    Haptic.big(); Sfx.nope();
+    if (lives <= 0) return gameOver();
+    toast(lives === 1 ? '마지막 목숨' : '똥 맞았다');
+  }
+
+  // ---------- 점수·간식·순위 (다른 게임과 같은 방식) ----------
+  let sent = 0, bestP = Promise.resolve(), kibbleDone = false, endTimer = 0;
+  function sendGained(keepalive) {
+    const s = Math.floor(score), gain = s - sent;
+    if (gain > 0) { sent = s; Score.send('dodge', gain, { keepalive }); bestP = Score.best('dodge', s, keepalive); }
+    return Math.max(0, gain);
+  }
+  const KIB_SEC = 20;
+  function giveKibble() { if (kibbleDone) return Promise.resolve(undefined); kibbleDone = true; Score.gameDone(); return Score.kibble('dodge'); }
+  const kibbleIfPlayed = () => (started && time >= KIB_SEC ? giveKibble() : Promise.resolve(undefined));
+  const kibbleText = (r) => r === undefined ? `${KIB_SEC}초 버티면` : r && r.ok ? `+1 (오늘 ${r.today}/20)` : r && r.reason === 'cap' ? '오늘 20알 다 모았어' : r && (r.reason === 'ipcap' || r.reason === 'daycap') ? '오늘은 여기까지 받을 수 있어' : '나중에 다시 보낼게';
+  addEventListener('pagehide', () => { if (running) { sendGained(true); kibbleIfPlayed(); } });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { targetX = null; keyDir = 0; activeId = null; sendGained(true); pauseGame(); } });
+  function bestScore() { let b = 0; try { b = +localStorage.getItem('doduk-dodge-best') || 0; if (score > b) localStorage.setItem('doduk-dodge-best', Math.floor(score)); } catch {} return b; }
+  function gameOver() {
+    running = false; over = true;
+    const kib = kibbleIfPlayed();
+    Sfx.over(); Haptic.nope();
+    const best = bestScore(), s = Math.floor(score);
+    document.getElementById('endScore').textContent = `${s}점`;
+    document.getElementById('endDetail').innerHTML = `${time.toFixed(1)}초 버팀 · ${level}단계<br>피한 똥 ${dodged}개${nearMiss ? ` · 아슬아슬 ${nearMiss}번` : ''}${bones ? ` · 뼈다귀 ${bones}개` : ''}`;
+    document.getElementById('endBest').textContent = s > best ? '내 최고 기록' : `내 최고 기록 ${best}점`;
+    const given = sendGained();
+    const el = document.getElementById('endEveryone');
+    el.innerHTML = `<div><span>보호소 간식 한 알</span><b id="kibEnd">보내는 중</b></div><div><span>이번에 모두의 점수에 보탬</span><b>+${Score.fmt(given)}</b></div>`;
+    kib.then((r) => { const b = document.getElementById('kibEnd'); if (b) b.textContent = kibbleText(r); if (r && r.ok) Sfx.kibble(); });
+    const boardEl = document.getElementById('endBoard'); boardEl.textContent = '';
+    bestP.then(() => Score.renderBoard(boardEl, 'dodge'));
+    endTimer = setTimeout(() => { if (over) document.getElementById('endBox').classList.add('open'); }, 700);
+  }
+
+  // ---------- 시작·멈춤·버튼 ----------
+  function start() {
+    poops = []; items = []; parts = []; floats = []; splats = [];
+    time = 0; score = 0; lives = 3; level = 1; invUntil = 0; nextPoop = 0.8; nextItem = 4; dodged = 0; nearMiss = 0; bones = 0;
+    clearTimeout(endTimer); document.getElementById('endBox').classList.remove('open');
+    px = WW / 2; vx = 0; targetX = null; keyDir = 0; sent = 0; kibbleDone = false; over = false; started = true; running = true; paused = false;
+    updateHud(); toast('누른 채 좌우로 밀어서 피해');
+  }
+  function pauseGame() { if (!running || paused) return; paused = true; document.getElementById('pauseBox').classList.add('open'); }
+  function resumeGame() { if (!paused) return; paused = false; last = performance.now(); document.getElementById('pauseBox').classList.remove('open'); Sfx.tap(); }
+  document.getElementById('pauseBtn').onclick = () => { if (running) { Sfx.tap(); pauseGame(); } else toast('게임 중에만 멈출 수 있어'); };
+  document.getElementById('resumeBtn').onclick = resumeGame;
+  document.getElementById('startBtn').onclick = () => { document.getElementById('startBox').classList.remove('open'); start(); };
+  document.getElementById('againBtn').onclick = () => { document.getElementById('endBox').classList.remove('open'); start(); };
+  let restartArm = 0;
+  document.getElementById('restartBtn').onclick = () => {
+    if (running && score > 50 && Date.now() - restartArm > 2000) { restartArm = Date.now(); toast('한 번 더 누르면 처음부터'); return; }
+    restartArm = 0; if (running) { sendGained(); kibbleIfPlayed(); } document.getElementById('endBox').classList.remove('open'); start();
+  };
+  const vibeBtn = document.getElementById('vibeBtn');
+  const vibeLabel = () => { vibeBtn.textContent = Haptic.on ? '진동 켬' : '진동 끔'; vibeBtn.classList.toggle('off', !Haptic.on); };
+  vibeBtn.onclick = () => { Haptic.toggle(); vibeLabel(); };
+  vibeLabel();
+  const soundBtn = document.getElementById('soundBtn');
+  const soundLabel = () => { soundBtn.textContent = Sfx.on ? '소리 켬' : '소리 끔'; soundBtn.classList.toggle('off', !Sfx.on); };
+  soundBtn.onclick = () => { Sfx.toggle(); soundLabel(); };
+  soundLabel();
+  let toastTimer = 0;
+  function toast(t) { const el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 1100); }
+  function updateHud() {
+    document.getElementById('time').textContent = time.toFixed(1);
+    document.getElementById('score').textContent = Math.floor(score);
+    document.getElementById('lives').textContent = '♥'.repeat(Math.max(0, lives)) + '♡'.repeat(Math.max(0, 3 - lives));
+    document.getElementById('level').textContent = level;
+  }
+
+  // ---------- 매 프레임 ----------
+  let last = performance.now();
+  function frame(now) {
+    try {
+      if (!cssW || !k || (stageEl.clientWidth && Math.abs(Math.min(stageEl.clientWidth, 480) - cssW) > 2)) layout();   // 처음 열릴 때 크기가 0이었으면 다시 잼
+      const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+      if (running && !paused) step(dt);
+      else if (!running) { for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 400 * dt; p.life -= dt * 1.6; } parts = parts.filter((p) => p.life > 0); }
+      drawScene(now / 1000);
+    } catch (e) { const el = document.getElementById('err'); el.style.display = 'block'; el.textContent = '오류: ' + e.message; }
+    requestAnimationFrame(frame);
+  }
+  updateHud(); requestAnimationFrame(frame);
+  window.__dodge = { get state() { return { time, score, lives, level, poops: poops.length, px }; }, start, step, hitHead, hitBody };   // 시험용
+})();
+</script>
+</body>
+</html>
