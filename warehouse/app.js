@@ -42,7 +42,7 @@ resize();
 // ---------- 나 ----------
 const myId = Math.random().toString(36).slice(2, 10);
 const me = { id: myId, breed: Math.floor(Math.random() * BREEDS.length), scene: 'hall', x: ENTRY.x, y: ENTRY.y, tx: ENTRY.x, ty: ENTRY.y, acc: '' };
-try { me.acc = localStorage.getItem('doduk-acc') || ''; } catch {}   // 옷장에서 고른 소품은 다음에 와도 유지   // 들어오면 입구에 서 있음
+try { me.acc = localStorage.getItem('doduk-acc') || ''; me.wear = localStorage.getItem('doduk-wear') || ''; } catch {}   // 옷장에서 고른 소품은 다음에 와도 유지   // 들어오면 입구에 서 있음
 try { const b = Number(localStorage.getItem('doduk-breed')); if (localStorage.getItem('doduk-breed') !== null && BREEDS[b]) me.breed = b; } catch {}   // 지난번에 고른 품종
 me.name = window.Score ? Score.myName() : '';   // 순위판 별명 (없으면 품종 이름으로 보임)
 const nameOk = (n) => !!(window.Score && Score.nameOk(n));   // 다른 손님이 보낸 이름도 같은 규칙으로 거름
@@ -95,15 +95,18 @@ function doors() {
 // extras.js(미니게임·트리 등)가 끼어드는 자리: 광장 그리기, 매 프레임, 실시간 메시지
 const plazaHooks = [], frameHooks = [], extraHandlers = {};
 const peers = new Map();   // id → { breed, x, y, tx, ty, seq, seen, goneAt, act }
-const okBreed = (n) => (Number.isInteger(n) && BREEDS[n] ? n : 0);   // 모르는 품종 번호(옛 화면·새 화면 섞임)는 0번으로
+const okBreed = (n) => (Number.isInteger(n) && BREEDS[n] ? n : 0);
+const okWear = (w) => (typeof w === 'string' && WEARS.some((x) => x.id === w) ? w : '');   // 다른 손님 옷도 목록에 있는 것만
+const okAcc = (a) => (typeof a === 'string' && ACCESSORIES.some((x) => x.id === a) ? a : '');   // 소품도 목록에 있는 것만   // 모르는 품종 번호(옛 화면·새 화면 섞임)는 0번으로
 function onPeer(p) {
   if (p.id === myId) return;
   p.breed = okBreed(p.breed);
   if (p.scene !== me.scene) { peers.delete(p.id); return; }
   const cur = peers.get(p.id);
   const name = nameOk(p.name) ? p.name : '';
-  if (cur) { cur.breed = p.breed; cur.acc = p.acc; cur.name = name; cur.seen = Date.now(); cur.goneAt = 0; return; }   // 이동은 Broadcast가 맡음
-  peers.set(p.id, { breed: p.breed, acc: p.acc, name, x: p.tx, y: p.ty, tx: p.tx, ty: p.ty, seq: 0, seen: Date.now(), goneAt: 0 });
+  const wear = okWear(p.wear);
+  if (cur) { cur.breed = p.breed; cur.acc = okAcc(p.acc); cur.wear = wear; cur.name = name; cur.seen = Date.now(); cur.goneAt = 0; return; }   // 이동은 Broadcast가 맡음
+  peers.set(p.id, { breed: p.breed, acc: okAcc(p.acc), wear, name, x: p.tx, y: p.ty, tx: p.tx, ty: p.ty, seq: 0, seen: Date.now(), goneAt: 0 });
   greetNewcomer();
 
 }
@@ -120,7 +123,7 @@ function onMove(m) {
   if (!cur) { cur = { breed: m.breed, x: m.sx, y: m.sy, seq: 0 }; peers.set(m.id, cur); greetNewcomer(); }
   if (m.seq <= cur.seq) return;   // 늦게 도착한 예전 이동은 무시
   if (Math.hypot(cur.x - m.sx, cur.y - m.sy) > 50) { cur.x = m.sx; cur.y = m.sy; }
-  Object.assign(cur, { breed: m.breed, acc: m.acc ?? cur.acc, name: m.name === undefined ? cur.name : nameOk(m.name) ? m.name : '', tx: m.tx, ty: m.ty, seq: m.seq, seen: Date.now(), goneAt: 0 });
+  Object.assign(cur, { breed: m.breed, acc: m.acc === undefined ? cur.acc : okAcc(m.acc), wear: m.wear === undefined ? cur.wear : okWear(m.wear), name: m.name === undefined ? cur.name : nameOk(m.name) ? m.name : '', tx: m.tx, ty: m.ty, seq: m.seq, seen: Date.now(), goneAt: 0 });
   if (cur.act && cur.act.a === 'sleep') cur.act = null;   // 움직이면 잠에서 깸
 }
 
@@ -168,8 +171,8 @@ function onAct(id, a, x, y) {
 const net = (() => {
   const cfg = location.search.includes('film') ? {} : window.DODUK || {};   // 홍보 영상 촬영(?film)은 실제 손님과 섞이지 않게 혼자 모드
   let seq = 0;
-  const presence = () => ({ id: me.id, breed: me.breed, acc: me.acc, name: me.name || '', scene: me.scene, tx: Math.round(me.tx), ty: Math.round(me.ty), ts: Date.now() });
-  const move = () => ({ id: me.id, breed: me.breed, acc: me.acc, name: me.name || '', scene: me.scene, sx: Math.round(me.x), sy: Math.round(me.y), tx: Math.round(me.tx), ty: Math.round(me.ty), seq: ++seq });
+  const presence = () => ({ id: me.id, breed: me.breed, acc: me.acc, wear: me.wear || '', name: me.name || '', scene: me.scene, tx: Math.round(me.tx), ty: Math.round(me.ty), ts: Date.now() });
+  const move = () => ({ id: me.id, breed: me.breed, acc: me.acc, wear: me.wear || '', name: me.name || '', scene: me.scene, sx: Math.round(me.x), sy: Math.round(me.y), tx: Math.round(me.tx), ty: Math.round(me.ty), seq: ++seq });
   if (cfg.supabaseUrl && cfg.supabaseKey && window.supabase) {
     // worker: 화면이 뒤로 가도 연결 유지 신호(heartbeat)가 밀리지 않게 별도 작업자에서 보냄
     const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, { realtime: { worker: true } });
@@ -321,14 +324,30 @@ function faceIcon(cv, breed, acc) {
   const dpr2 = 2, w = cv.clientWidth || 54, h = cv.clientHeight || 54;
   cv.width = w * dpr2; cv.height = h * dpr2;
   const q = cv.getContext('2d'); q.setTransform(dpr2, 0, 0, dpr2, 0, 0); q.clearRect(0, 0, w, h);
-  const b = BREEDS[breed], headR = b.headR ?? 16, snout = b.snout ?? (b.kind === 'dog' ? 7 : 0);
-  const k = Math.min(w / (headR * 2.6 + snout + 10), h / (headR * 2.9 + 16));
-  q.save(); q.translate(w / 2, h * 0.58); q.scale(k, k);
-  q.lineWidth = 2.4; q.strokeStyle = '#2a2420'; q.lineJoin = 'round'; q.lineCap = 'round';
-  const hx = -(snout - headR * 0.17) / 2;
-  drawHead(q, b, hx, 0, headR, b.head ?? b.base, snout, 0.3, breed);
-  if (acc) drawAccessory(q, acc, hx, 0, headR);
+  // 소품이 칸 밖으로 안 나가게: 높은 모자는 얼굴을 조금 작게·아래로, 목에 하는 건 위로
+  const m = Math.min(w, h), a = acc || '';
+  const TALL = ['bunny', 'party', 'witch', 'chef'], MID = ['santa', 'halo', 'crown', 'grad', 'pirate', 'beanie', 'bucket', 'beret', 'tiara', 'sprout', 'cap', 'headphones', 'flowercrown'], NECK = ['bell', 'scarf', 'bandana', 'bowtie'];
+  const wideHead = (specOf(BREEDS[breed]).hw || 1) > 1;
+  const [cy, r] = TALL.includes(a) ? [0.72, 0.21] : MID.includes(a) ? [0.64, 0.25] : NECK.includes(a) ? [0.5, 0.26] : a === 'mask' ? [0.6, wideHead ? 0.22 : 0.25] : [0.6, 0.29];   // 복면은 끈이 옆으로 나와서 조금 작게
+  drawFace(q, breed, a, w / 2, h * cy, m * r);   // 정면 얼굴 (pets.js)
+}
+// 캐릭터 전체를 칸에 꼭 맞게 그림: 실제 높이를 먼저 재고 크기를 정함 (큰 품종·높은 모자도 안 잘리게)
+const measureCtx = document.createElement('canvas').getContext('2d');
+function fitPet(q, w, h, pet, pad = 4) {
+  const top = drawPet(measureCtx, { ...pet, x: 0, y: 0, tx: 0, ty: 0, face: 1, noTag: true }, 0.3, false);   // 위쪽 끝 (음수)
+  const sp = specOf(BREEDS[pet.breed]);
+  const tall = -top + 12, wide = tall * Math.max(1.05, 0.55 + (sp.bw || 1) * 0.55);   // 발밑 그림자·날개까지, 몸이 긴 품종(닥스훈트·코기)은 옆으로 넓게
+  const z = Math.min((h - pad * 2) / tall, (w - pad * 2) / wide);
+  q.save(); q.translate(w / 2, h - pad - 7 * z); q.scale(z, z);
+  drawPet(q, { ...pet, x: 0, y: 0, tx: 0, ty: 0, face: 1, noTag: true }, pet.t ?? 0.3, false);
   q.restore();
+}
+// 몸 전체 아이콘 (옷장 "옷" 칸)
+function bodyIcon(cv, breed, acc, wear) {
+  const dpr2 = 2, w = cv.clientWidth || 54, h = cv.clientHeight || 54;
+  cv.width = w * dpr2; cv.height = h * dpr2;
+  const q = cv.getContext('2d'); q.setTransform(dpr2, 0, 0, dpr2, 0, 0); q.clearRect(0, 0, w, h);
+  fitPet(q, w, h, { breed, acc, wear }, 2);
 }
 // 고르는 칸이 좁아서 긴 품종 이름은 자연스러운 자리에서 두 줄로 (11.11 대표님: 글씨 잘림)
 const PICK_SPLIT = { 이탈리안그레이하운드: '이탈리안 그레이하운드', 시베리안허스키: '시베리안 허스키', 베들링턴테리어: '베들링턴 테리어',
@@ -436,42 +455,51 @@ document.getElementById('rankClose').onclick = () => closeLayer(closeRank);
 const wardEl = document.getElementById('wardrobe');
 const gamesDone = () => { try { return Number(localStorage.getItem('doduk-games-done')) || 0; } catch { return 0; } };
 // 잠긴 소품도 모양·이름을 다 보여 줌 (11.10 대표님: 뭐가 있는지 알아야 함). 누르면 위 미리보기에 입혀 봄
-let peekAcc = null;
+// 11.11: 칸이 둘 (소품 = 머리·목, 옷 = 몸). 둘 다 따로 입음
+let peekAcc = null, wardTab = 'acc';
 const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-function drawWardPreview(acc) {
+const LISTS = { acc: () => ACCESSORIES, wear: () => WEARS };
+function drawWardPreview(acc, wear) {
   const pv = document.getElementById('wardPreview'), q = pv.getContext('2d');
   q.setTransform(1, 0, 0, 1, 0, 0); q.clearRect(0, 0, pv.width, pv.height);
-  drawPet(q, { breed: me.breed, acc, x: pv.width / 2 - 10, y: pv.height - 22, tx: pv.width / 2 - 10, ty: pv.height - 22, face: 1, noTag: true }, performance.now() / 1000, false);
+  fitPet(q, pv.width, pv.height, { breed: me.breed, acc, wear, t: performance.now() / 1000 }, 8);   // 큰 품종·높은 모자도 창 안에
 }
 function renderWardrobe() {
-  const n = gamesDone(), next = ACCESSORIES.find((a) => a.need > n);
+  const n = gamesDone(), list = LISTS[wardTab]();
+  const all = [...ACCESSORIES, ...WEARS].filter((a) => a.need > n).sort((a, b) => a.need - b.need), next = all[0];
   const info = document.getElementById('wardInfo');
-  const peek = peekAcc && ACCESSORIES.find((a) => a.id === peekAcc);
+  const peek = peekAcc && list.find((a) => a.id === peekAcc);
+  wardEl.querySelectorAll('#wardTabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === wardTab));
   if (peek) info.innerHTML = `<b>${escHtml(peek.name)}</b> 미리 입어 보는 중 · 게임 <b>${peek.need - n}판</b> 더 하면 입을 수 있어`;
   else info.innerHTML = `끝낸 게임 <b>${n}판</b>${next ? ` · ${next.need - n}판 더 하면 ${escHtml(next.name)}` : ' · 다 풀었어'}<br>잠긴 것도 눌러서 미리 입어 볼 수 있어`;
-  drawWardPreview(peek ? peek.id : me.acc);
+  drawWardPreview(wardTab === 'acc' && peek ? peek.id : me.acc, wardTab === 'wear' && peek ? peek.id : me.wear);
   const grid = document.getElementById('accGrid'), scroller = grid.closest('.box'), keep = scroller.scrollTop; grid.innerHTML = '';
-  for (const a of ACCESSORIES) {
+  const cur = wardTab === 'acc' ? me.acc : me.wear;
+  for (const a of list) {
     const open = n >= (a.need || 0);
     const btn = document.createElement('button');
-    btn.className = `${a.id === me.acc && !peek ? 'on' : ''} ${open ? '' : 'locked'} ${a.id === peekAcc ? 'peek' : ''}`;
-    btn.innerHTML = `<canvas></canvas>${escHtml(a.name)}${open ? '' : `<span class="need">${a.need}판</span>`}`;
+    btn.className = `${a.id === cur && !peek ? 'on' : ''} ${open ? '' : 'locked'} ${a.id === peekAcc ? 'peek' : ''}`;
+    btn.innerHTML = `<canvas></canvas><span class="nm">${escHtml(a.name)}</span>${open ? '' : `<span class="need">${a.need}판</span>`}`;
     btn.onclick = () => {
       if (!open) { peekAcc = peekAcc === a.id ? null : a.id; renderWardrobe(); return; }
       peekAcc = null;
-      me.acc = a.id; try { localStorage.setItem('doduk-acc', a.id); } catch {}
+      if (wardTab === 'acc') { me.acc = a.id; try { localStorage.setItem('doduk-acc', a.id); } catch {} }
+      else { me.wear = a.id; try { localStorage.setItem('doduk-wear', a.id); } catch {} }
       net.send(); renderWardrobe();
     };
     grid.appendChild(btn);
-    faceIcon(btn.querySelector('canvas'), me.breed, a.id);
+    if (wardTab === 'acc') faceIcon(btn.querySelector('canvas'), me.breed, a.id);
+    else bodyIcon(btn.querySelector('canvas'), me.breed, '', a.id);
   }
   scroller.scrollTop = keep;   // 고를 때마다 맨 위로 튀지 않게
 }
-const closeWard = () => { peekAcc = null; wardEl.classList.remove('open'); if (me.acc) speech.set(myId, { text: '어때', until: Date.now() + 1500 }); };
+wardEl.querySelectorAll('#wardTabs button').forEach((b) => { b.onclick = () => { wardTab = b.dataset.tab; peekAcc = null; renderWardrobe(); }; });
+const closeWard = () => { peekAcc = null; wardEl.classList.remove('open'); if (me.acc || me.wear) speech.set(myId, { text: '어때', until: Date.now() + 1500 }); };
 document.getElementById('wardBtn').onclick = () => { peekAcc = null; if (!wardEl.classList.contains('open')) openLayer(closeWard); wardEl.classList.add('open'); renderWardrobe(); };
 document.getElementById('wardClose').onclick = () => closeLayer(closeWard);
-// 예전에 고른 소품이 아직 안 풀린 거면 벗김 (판 수 기준이 새로 생겨서)
+// 예전에 고른 것이 아직 안 풀린 거면 벗김 (판 수 기준이 새로 생겨서)
 { const a = ACCESSORIES.find((x) => x.id === me.acc); if (a && gamesDone() < (a.need || 0)) { me.acc = ''; try { localStorage.setItem('doduk-acc', ''); } catch {} } }
+{ const a = WEARS.find((x) => x.id === me.wear); if (!a || gamesDone() < (a.need || 0)) { me.wear = ''; try { localStorage.setItem('doduk-wear', ''); } catch {} } }
 document.getElementById('talk').onclick = () => { phrasesEl.classList.toggle('open'); actionsEl.classList.remove('open'); };
 document.getElementById('act').onclick = () => { actionsEl.classList.toggle('open'); phrasesEl.classList.remove('open'); };
 
@@ -914,7 +942,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function capture() {
   const now = performance.now();
   return [me, ...[...peers.values()].filter(inSpot)].slice(0, 6).map((p) => ({
-    breed: p.breed, x: p.x, y: p.y, face: p.face ?? 1, acc: p.acc || '', mine: p === me,
+    breed: p.breed, x: p.x, y: p.y, face: p.face ?? 1, acc: p.acc || '', wear: p.wear || '', mine: p === me,
     a: p.act ? p.act.a : null, k: p.act ? Math.min(1, (now - p.act.start) / p.act.dur) : 0,
   })).sort((a, b) => a.y - b.y);
 }
@@ -928,7 +956,7 @@ function drawSnapPet(g, p, x, y, k) {
   const dy = p.a === 'jump' ? -Math.sin(p.k * Math.PI) * 55 : 0;
   if (p.a === 'roll') { g.translate(0, -30); g.rotate(p.k * Math.PI * 2 * p.face); g.translate(0, 30); }
   if (p.a === 'sleep' || p.a === 'poop') g.scale(1, 0.82);
-  const top = drawPet(g, { breed: p.breed, x: 0, y: dy, tx: 0, ty: dy, face: p.face, acc: p.acc, noTag: true }, 0.4, false);
+  const top = drawPet(g, { breed: p.breed, x: 0, y: dy, tx: 0, ty: dy, face: p.face, acc: p.acc, wear: p.wear, noTag: true }, 0.4, false);
   g.restore();
   const hy = y + top * k;
   if (p.a === 'heart') for (let i = 0; i < 3; i++) heart(g, x + (i - 1) * 16 * k, hy - 8 * k - (i % 2) * 10 * k, 4 * k, '#F06A86');
@@ -1498,7 +1526,8 @@ function spawnNpcs() {
     used.add(breed);
     const acc = Math.random() < 0.35 ? ACCESSORIES[1 + Math.floor(Math.random() * (ACCESSORIES.length - 1))].id : '';
     const x = dance ? rndIn(120, 600) : rndIn(380, 1060), y = dance ? rndIn(380, 1000) : rndIn(780, 1640);   // 광장은 처음 들어왔을 때 보이게 입구·가운데 쪽에 모아서 시작
-    npcs.set(`npc${i}`, { npc: true, breed, acc, x, y, tx: x, ty: y, next: performance.now() + rndIn(500, 4000) });
+    const wear = Math.random() < 0.3 ? WEARS[1 + Math.floor(Math.random() * (WEARS.length - 1))].id : '';   // 주민도 가끔 옷을 입음 (옷장 구경거리)
+    npcs.set(`npc${i}`, { npc: true, breed, acc, wear, x, y, tx: x, ty: y, next: performance.now() + rndIn(500, 4000) });
   }
 }
 function activeNpcs() {
