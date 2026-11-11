@@ -330,6 +330,12 @@ function faceIcon(cv, breed, acc) {
   if (acc) drawAccessory(q, acc, hx, 0, headR);
   q.restore();
 }
+// 고르는 칸이 좁아서 긴 품종 이름은 자연스러운 자리에서 두 줄로 (11.11 대표님: 글씨 잘림)
+const PICK_SPLIT = { 이탈리안그레이하운드: '이탈리안 그레이하운드', 시베리안허스키: '시베리안 허스키', 베들링턴테리어: '베들링턴 테리어',
+  미니어처슈나우저: '미니어처 슈나우저', 브리티시숏헤어: '브리티시 숏헤어', 아메리칸숏헤어: '아메리칸 숏헤어', 엑조틱숏헤어: '엑조틱 숏헤어',
+  골든리트리버: '골든 리트리버', 요크셔테리어: '요크셔 테리어', 잉글리시불독: '잉글리시 불독', 그레이트데인: '그레이트 데인', 프렌치불독: '프렌치 불독',
+  스코티시폴드: '스코티시 폴드', 터키시앙고라: '터키시 앙고라', 노르웨이숲: '노르웨이 숲', 시고르자브종: '시고르 자브종', 포메라니안: '포메 라니안', 러시안블루: '러시안 블루', 아비시니안: '아비 시니안' };
+const pickLabel = (n) => (PICK_SPLIT[n] ? PICK_SPLIT[n].replace(' ', '<wbr>') : n);   // 눈에 안 보이는 줄바꿈 자리 (한 줄에 들어가면 붙여서 보임)
 let pickTab = BREEDS[me.breed].kind, pickIdx = me.breed;
 const breedGrid = document.getElementById('breedGrid');
 function renderPick() {
@@ -345,7 +351,7 @@ function renderPick() {
     if (b.kind !== pickTab) return;
     const btn = document.createElement('button');
     btn.className = i === pickIdx ? 'on' : '';
-    btn.innerHTML = `<canvas></canvas>${b.name}`;
+    btn.innerHTML = `<canvas></canvas><span class="nm">${pickLabel(b.name)}</span>`;
     btn.onclick = () => { pickIdx = i; renderPick(); };
     breedGrid.appendChild(btn);
     faceIcon(btn.querySelector('canvas'), i, me.acc);
