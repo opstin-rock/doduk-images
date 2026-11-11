@@ -115,7 +115,7 @@ window.Score = (() => {
     const a = new Uint8Array(16); (crypto.getRandomValues ? crypto.getRandomValues(a) : a.forEach((_, i) => { a[i] = Math.random() * 256; }));
     secret = [...a].map((x) => x.toString(16).padStart(2, '0')).join(''); lsSet('doduk-secret', secret);
   }
-  const GAME_NAME = { sacheon: '사천성', peaks: '트라이피크' };
+  const GAME_NAME = { sacheon: '사천성', peaks: '트라이피크', dodge: '똥피하기' };
   const BAD = ['관리자', '운영자', '운영진', '도둑냥', '펫바자', '옵스틴', 'admin', '시발', '씨발', '씨팔', '시팔', '병신', '븅신', '좆', '존나', '졸라',
     '개새', '새끼', '미친', '지랄', 'fuck', 'shit', 'sex', '섹스', '보지', '자지', '엠창', '니미', '애미', '애비', '느금', 'sibal', 'bitch'];
   // 서버와 같은 규칙 (2~8자, 한글·영문·숫자, 금지어 없음). 다른 손님 이름표를 그릴 때도 이걸로 거름
@@ -167,6 +167,8 @@ window.Score = (() => {
 .rk-form{display:flex;gap:6px;margin-top:6px}
 .rk-form input{flex:1;min-width:0;font-size:16px;padding:8px 10px;border:2px solid #2B2622;border-radius:10px;font-family:inherit}
 .rk-form button{flex:0 0 auto;margin:0;padding:8px 12px;font-size:15px;border-radius:10px;border:0;background:#2B2622;color:#fff;font-family:"Jua",sans-serif}
+.box .rk-form button{width:auto!important;margin:0!important;flex:0 0 auto!important;padding:8px 12px!important;font-size:15px!important}
+.box .rk-form input{flex:1 1 auto;width:auto}
 .rk-msg{font-size:12px;color:#E8402F;text-align:center;min-height:14px;margin-top:3px;word-break:keep-all}`;
     document.head.appendChild(st);
   } catch {}
