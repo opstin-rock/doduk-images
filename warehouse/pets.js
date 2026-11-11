@@ -214,23 +214,26 @@ function drawEar(g, s, side, cx, HY, W, HR, layer) {
     }
     return;
   }
-  if (layer !== 'front') return;
   if (type === 'fold') {   // 스코티시폴드: 머리 위에 납작하게 접힌 작은 귀
+    if (layer !== 'front') return;
     g.save(); g.translate(cx + side * W * 0.55, HY - HR * 0.82); g.rotate(side * 0.5);
     g.beginPath(); g.moveTo(-8, -2); g.quadraticCurveTo(0, -9, 8, -2); g.quadraticCurveTo(0, 4, -8, -2); g.fillStyle = col; g.fill(); g.stroke(); g.restore();
     return;
   }
   if (type === 'button' || type === 'rose') {   // 퍼그·불독(앞으로 접힘), 그레이하운드(뒤로 젖힌 작은 귀)
+    if (layer !== 'front') return;
     g.beginPath();
     if (type === 'button') { g.moveTo(cx + side * W * 0.45, HY - HR * 0.88); g.lineTo(cx + side * W * 1.02, HY - HR * 0.62); g.lineTo(cx + side * W * 0.72, HY - HR * 0.3); }
     else { g.moveTo(cx + side * W * 0.5, HY - HR * 0.85); g.quadraticCurveTo(cx + side * W * 1.05, HY - HR * 1.05, cx + side * W * 1.1, HY - HR * 0.55); g.lineTo(cx + side * W * 0.8, HY - HR * 0.55); }
     g.closePath(); g.fillStyle = col; g.fill(); g.stroke(); return;
   }
   // 늘어진 귀: flop 보통, long 길게, hair 털 귀
+  // 11.11 대표님: 얼굴 앞에서 눈을 가려서 이상함 → 머리 뒤에, 얼굴 바깥쪽으로 비스듬히 늘어지게
+  if (layer === 'front') return;
   const len = type === 'long' ? 1.5 : type === 'hair' ? 1.35 : 1;
-  g.save(); g.translate(cx + side * W * 0.9, HY - HR * 0.35); g.rotate(side * (type === 'long' ? 0.12 : 0.25));
-  if (type === 'hair') fluffEllipse(g, 0, HR * 0.45 * len, 9, HR * 0.55 * len, 6, 0.12);
-  else { g.beginPath(); g.ellipse(0, HR * 0.42 * len, type === 'long' ? 9.5 : 8, HR * 0.5 * len, 0, 0, Math.PI * 2); }
+  g.save(); g.translate(cx + side * W * 1.0, HY - HR * 0.62); g.rotate(-side * 0.05);
+  if (type === 'hair') fluffEllipse(g, 0, HR * 0.45 * len, 7.5, HR * 0.55 * len, 6, 0.12);
+  else { g.beginPath(); g.ellipse(0, HR * 0.42 * len, type === 'long' ? 9 : 7.5, HR * 0.5 * len, 0, 0, Math.PI * 2); }
   g.fillStyle = shadedFill(g, col, 0, HR * 0.3, HR * 0.6); g.fill(); g.stroke(); g.restore();
 }
 
