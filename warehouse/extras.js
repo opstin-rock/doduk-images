@@ -21,10 +21,10 @@
   // =====================================================================
   const GAMES = [
     // 광장 전체가 오락실 (2026-11-09). 앞줄: 지금 할 수 있는 게임, 뒷줄: 만드는 중 (불 꺼진 게임기)
-    { id: 'sacheon', name: '사천성', x: 560, y: 900, url: 'lab/link.html?embed=1&v=22', body: '#E8402F', screen: 'sacheon' },
-    { id: 'peaks', name: '트라이피크', x: 720, y: 900, url: 'lab/peaks.html?embed=1&v=17', body: '#3D7BD9', screen: 'peaks' },
+    { id: 'sacheon', name: '사천성', x: 560, y: 900, url: 'lab/link.html?embed=1&v=23', body: '#E8402F', screen: 'sacheon' },
+    { id: 'peaks', name: '트라이피크', x: 720, y: 900, url: 'lab/peaks.html?embed=1&v=18', body: '#3D7BD9', screen: 'peaks' },
     // 아직 안 연 게임은 이름을 숨김 (대표님 11.10: "???"로)
-    { id: 'soon1', name: '???', x: 880, y: 900, soon: true, body: '#8C7FA8' },
+    { id: 'dodge', name: '똥피하기', x: 880, y: 900, url: 'lab/dodge.html?embed=1&v=2', body: '#5FA86B', screen: 'dodge' },   // 11.11 대표님
     { id: 'soon2', name: '???', x: 400, y: 1230, soon: true, body: '#8C7FA8' },
     { id: 'soon3', name: '???', x: 1040, y: 1230, soon: true, body: '#8C7FA8' },
   ];
@@ -65,6 +65,11 @@
       const cols = ['#FFE3C2', '#E6F4FF', '#FDE4EC', '#DDF2E3'];
       for (let i = 0; i < 6; i++) { const cx = x - 27 + (i % 3) * 19, cy = y - 121 + Math.floor(i / 3) * 22; ctx.fillStyle = cols[(i + Math.floor(t * 2)) % 4]; ctx.fillRect(cx, cy, 15, 18); }
       ctx.strokeStyle = '#E8402F'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 20, y - 103); ctx.lineTo(x - 20, y - 78); ctx.lineTo(x + 18, y - 78); ctx.lineTo(x + 18, y - 81); ctx.stroke();
+    } else if (gm.screen === 'dodge') {   // 똥피하기: 하늘색 화면에 떨어지는 똥 + 바닥의 강아지
+      ctx.fillStyle = '#CFE8F7'; ctx.fillRect(x - 33, y - 127, 66, 52);
+      ctx.fillStyle = '#D9B98C'; ctx.fillRect(x - 33, y - 84, 66, 9);
+      for (let i = 0; i < 3; i++) { const fx = x - 22 + i * 21, fy = y - 125 + ((t * 30 + i * 17) % 38); ctx.fillStyle = '#8B5A2B'; ctx.beginPath(); ctx.ellipse(fx, fy + 3, 5, 3, 0, 0, Math.PI * 2); ctx.ellipse(fx, fy, 3.5, 2.5, 0, 0, Math.PI * 2); ctx.fill(); }
+      const dx = x + Math.sin(t * 2.5) * 18; ctx.fillStyle = '#F2B35B'; ctx.beginPath(); ctx.arc(dx, y - 90, 6, 0, Math.PI * 2); ctx.fill();
     } else {
       ctx.fillStyle = '#5E9E6E'; ctx.fillRect(x - 33, y - 127, 66, 52);
       for (const [dx, dy, back] of [[-18, -118, 1], [0, -118, 1], [18, -118, 1], [-9, -104, 0], [9, -104, 0]]) { ctx.fillStyle = back ? '#C9965F' : '#FFFDF8'; ctx.fillRect(x + dx - 6, y + dy, 12, 16); }
@@ -134,14 +139,16 @@
   const NEON_PINK = '#FF5DA2';
 
   // ---------- 순위 전광판 (11.10 대표님): 입구 바로 앞, 뒷줄 게임기 사이. 게임마다 1~3등 + 내 등수 ----------
-  const RANK = { x: 720, y: 1230, w: 470 };   // y는 다리 밑동
+  const RANK = { x: 720, y: 1230, w: 540 };   // 11.11 게임 3개라 조금 넓힘   // y는 다리 밑동
   const rankRect = () => ({ x: RANK.x - RANK.w / 2, y: RANK.y - 268, w: RANK.w, h: 232 });
-  let tops = { sacheon: null, peaks: null }, myRanks = null;
+  const RANK_GAMES = [['sacheon', '사천성', '사천성'], ['peaks', '트라이피크', '트피'], ['dodge', '똥피하기', '똥피']];
+  let tops = { sacheon: null, peaks: null, dodge: null }, myRanks = null;
   async function loadRanks() {
     if (!window.Score || !Score.board) return;
-    const [a, b, m] = await Promise.all([Score.board('sacheon', 3), Score.board('peaks', 3), Score.myInfo()]);
+    const [a, b, c, m] = await Promise.all([Score.board('sacheon', 3), Score.board('peaks', 3), Score.board('dodge', 3), Score.myInfo()]);
     if (a) tops.sacheon = a;
     if (b) tops.peaks = b;
+    if (c) tops.dodge = c;
     if (m && m.ok) myRanks = m;
   }
   if (!film) { loadRanks(); setInterval(loadRanks, 30000); }
@@ -156,28 +163,28 @@
     ctx.save(); ctx.shadowColor = '#FFD54A'; ctx.shadowBlur = 8; ctx.fillStyle = '#FFD54A'; ctx.font = '30px Jua'; ctx.fillText('순위 전광판', x, r.y + 38); ctx.restore();
     ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.font = '18px Jua'; ctx.fillText('각자 최고 점수 · 누르면 크게', x, r.y + 62);
     const MEDAL = ['#FFD54A', '#D9DEE8', '#E0A36B'];
-    [['sacheon', '사천성'], ['peaks', '트라이피크']].forEach(([id, name], col) => {
-      const cx = r.x + r.w * (col ? 0.75 : 0.25), left = cx - r.w * 0.23, right = cx + r.w * 0.23;
-      ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = '21px Jua'; ctx.fillText(name, cx, r.y + 90);
+    RANK_GAMES.forEach(([id, name], col) => {
+      const cw = r.w / 3, cx = r.x + cw * (col + 0.5), left = cx - cw * 0.44, right = cx + cw * 0.44;
+      ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = '20px Jua'; ctx.fillText(name, cx, r.y + 90);
       const list = tops[id];
       for (let i = 0; i < 3; i++) {
         const yy = r.y + 120 + i * 29, row = list && list[i];
         ctx.fillStyle = MEDAL[i]; ctx.beginPath(); ctx.arc(left + 10, yy - 6, 10, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#121A2E'; ctx.font = '14px Jua'; ctx.textAlign = 'center'; ctx.fillText(row ? row.rank : i + 1, left + 10, yy - 1);
-        ctx.textAlign = 'left'; ctx.font = '19px Jua';
+        ctx.textAlign = 'left'; ctx.font = '17px Jua';
         ctx.fillStyle = row && me.name && row.name === me.name ? '#FFD54A' : row ? '#fff' : 'rgba(255,255,255,.3)';
-        ctx.fillText(row ? cut(row.name, 5) : (i === 0 && list && !list.length ? '1등 비었어' : '-'), left + 26, yy);
+        ctx.fillText(row ? cut(row.name, 4) : (i === 0 && list && !list.length ? '비었어' : '-'), left + 24, yy);
         if (row) { ctx.textAlign = 'right'; ctx.fillStyle = '#FFD54A'; ctx.fillText(kib(row.score), right, yy); }
       }
     });
-    ctx.strokeStyle = 'rgba(79,209,255,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, r.y + 70); ctx.lineTo(x, r.y + 182); ctx.stroke();
+    ctx.strokeStyle = 'rgba(79,209,255,.35)'; ctx.lineWidth = 2; for (const k3 of [1, 2]) { ctx.beginPath(); ctx.moveTo(r.x + r.w * k3 / 3, r.y + 70); ctx.lineTo(r.x + r.w * k3 / 3, r.y + 182); ctx.stroke(); }
     // 내 등수 줄
     const g = (id) => myRanks && myRanks.games && myRanks.games[id];
     let mine;
-    if (!me.name) mine = g('sacheon') || g('peaks') ? '별명 정하면 내 등수가 떠' : '별명 정하고 한 판 하면 내 등수';
+    if (!me.name) mine = RANK_GAMES.some(([id]) => g(id)) ? '별명 정하면 내 등수가 떠' : '별명 정하고 한 판 하면 내 등수';
     else {
-      const part = (id, nm) => (g(id) && g(id).rank ? `${nm} ${g(id).rank}등` : `${nm} -`);
-      mine = `${cut(me.name, 6)} · ${part('sacheon', '사천성')} · ${part('peaks', '트라이피크')}`;
+      const parts = RANK_GAMES.filter(([id]) => g(id) && g(id).rank).map(([id, , short]) => `${short} ${g(id).rank}등`);
+      mine = parts.length ? `${cut(me.name, 6)} · ${parts.join(' · ')}` : `${cut(me.name, 6)} · 한 판 하면 내 등수가 떠`;
     }
     R(ctx, r.x + 16, r.y + r.h - 44, r.w - 32, 30, 10); ctx.fillStyle = Math.sin(t * 2) > -0.6 ? 'rgba(255,213,74,.16)' : 'rgba(255,213,74,.08)'; ctx.fill();
     ctx.textAlign = 'center'; ctx.fillStyle = '#FFE58A'; ctx.font = '19px Jua'; ctx.fillText(mine, x, r.y + r.h - 22);
