@@ -120,7 +120,9 @@
   .pick .nickmsg:empty { display:none; }
   .chooser .cs.nick { margin:4px 0 0; }
   
-  #wardPreview { display:block; width:200px; height:150px; margin:4px auto 0; }
+  #wardPreview { display:block; width:160px; height:120px; margin:0 auto; }
+  .wardTop { position:-webkit-sticky; position:sticky; top:-16px; z-index:3; background:#fff; padding:4px 0 2px; }   /* 미리보기는 늘 위에 (아래 칸을 눌러도 보이게) */
+  .wardTop .cs { margin:4px 0 6px; }
   .game-box canvas, .tree-box canvas { width:100%; display:block; border-radius:12px; touch-action:none; }
   .game-box .save, .tree-box .save { background:#f1f1f1; color:var(--ink); }
   .tree-box .chips { margin-top:10px; justify-content:center; }
@@ -180,8 +182,9 @@
 <div class="chooser" id="wardrobe">
   <div class="box pick">
     <div class="ct">옷장</div>
-    <canvas id="wardPreview" width="240" height="180"></canvas>
-    <div class="cs" id="wardInfo"></div>
+    <div class="wardTop"><canvas id="wardPreview" width="240" height="180"></canvas>
+    <div class="cs" id="wardInfo"></div></div>
+    <div class="tabs" id="wardTabs"><button data-tab="acc" class="on">모자·소품</button><button data-tab="wear">옷</button></div>
     <div class="grid" id="accGrid"></div>
     <div class="row2"><button id="wardClose" class="go">다 입었어</button></div>
   </div>
@@ -265,9 +268,9 @@
 </div>
 <script src="config.js?v=26"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="pets.js?v=35"></script>
+<script src="pets.js?v=37"></script>
 <script src="lab/score.js?v=6"></script>
-<script src="app.js?v=40"></script>
-<script src="extras.js?v=39"></script>
+<script src="app.js?v=43"></script>
+<script src="extras.js?v=41"></script>
 </body>
 </html>
