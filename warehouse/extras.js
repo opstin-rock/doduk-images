@@ -21,8 +21,8 @@
   // =====================================================================
   const GAMES = [
     // 광장 전체가 오락실 (2026-11-09). 앞줄: 지금 할 수 있는 게임, 뒷줄: 만드는 중 (불 꺼진 게임기)
-    { id: 'sacheon', name: '사천성', x: 560, y: 900, url: 'lab/link.html?embed=1&v=18', body: '#E8402F', screen: 'sacheon' },
-    { id: 'peaks', name: '트라이피크', x: 720, y: 900, url: 'lab/peaks.html?embed=1&v=13', body: '#3D7BD9', screen: 'peaks' },
+    { id: 'sacheon', name: '사천성', x: 560, y: 900, url: 'lab/link.html?embed=1&v=19', body: '#E8402F', screen: 'sacheon' },
+    { id: 'peaks', name: '트라이피크', x: 720, y: 900, url: 'lab/peaks.html?embed=1&v=14', body: '#3D7BD9', screen: 'peaks' },
     // 아직 안 연 게임은 이름을 숨김 (대표님 11.10: "???"로)
     { id: 'soon1', name: '???', x: 880, y: 900, soon: true, body: '#8C7FA8' },
     { id: 'soon2', name: '???', x: 400, y: 1230, soon: true, body: '#8C7FA8' },
@@ -99,22 +99,23 @@
     const n = Math.floor(w / 16);
     for (let i = 0; i < n; i++) { const on = Math.sin(t * 5 + i) > 0; ctx.fillStyle = on ? '#FFD54A' : 'rgba(255,213,74,.25)'; ctx.beginPath(); ctx.arc(x - w / 2 + 14 + i * ((w - 28) / (n - 1)), top + 12, 3.5, 0, Math.PI * 2); ctx.fill(); }
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#fff'; ctx.font = '24px Jua'; ctx.fillText('보호소에 간식 보내기', x, top + 46);
-    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.font = '15px Jua'; ctx.fillText('게임 한 판 = 간식 한 알 · 300알 모이면 간식 1개 · 보낼 곳은 정하는 중', x, top + 70);
+    // 글씨는 폰(화면 폭 360)에서 반으로 줄어 보이므로 넉넉히 크게 (11.11 테스터: 7px라 안 읽힘)
+    ctx.fillStyle = '#fff'; ctx.font = '30px Jua'; ctx.fillText('보호소에 간식 보내기', x, top + 48);
+    ctx.fillStyle = 'rgba(255,255,255,.82)'; ctx.font = '21px Jua'; ctx.fillText('게임 한 판 = 간식 한 알 · 300알마다 간식 1개', x, top + 78);
     // 진행 막대
     const goal = prog ? prog.goal : 300, cur = prog ? Math.min(prog.current, goal) : 0, done = prog && prog.current >= goal;
-    const bx = x - w / 2 + 28, bw = w - 56, by = top + 86, bh = 34;
+    const bx = x - w / 2 + 28, bw = w - 56, by = top + 90, bh = 30;
     R(ctx, bx, by, bw, bh, 17); ctx.fillStyle = '#2B2550'; ctx.fill();
     if (cur > 0) { R(ctx, bx, by, Math.max(34, bw * (cur / goal)), bh, 17); ctx.fillStyle = done ? (Math.sin(t * 6) > 0 ? '#FFD54A' : '#FF8A3D') : '#C9965F'; ctx.fill(); }
     for (let i = 0; i < Math.min(14, Math.floor((bw * (cur / goal)) / 26)); i++) drawKibble(bx + 16 + i * 26, by + bh / 2, 7, i % 2 ? '#FFF6E6' : '#FFE0B8');   // 막대 속 사료알
     ctx.strokeStyle = '#FFD54A'; ctx.lineWidth = 2; R(ctx, bx, by, bw, bh, 17); ctx.stroke();
-    ctx.save(); ctx.shadowColor = '#FFD54A'; ctx.shadowBlur = 10; ctx.fillStyle = '#FFD54A'; ctx.font = '40px Jua';
-    ctx.fillText(prog ? (done ? '목표 달성! 보내는 중' : `${kib(cur)} / ${kib(goal)}알`) : '- / 300알', x, by + bh + 46); ctx.restore();
-    ctx.fillStyle = 'rgba(255,255,255,.88)'; ctx.font = '17px Jua';
+    ctx.save(); ctx.shadowColor = '#FFD54A'; ctx.shadowBlur = 10; ctx.fillStyle = '#FFD54A'; ctx.font = '42px Jua';
+    ctx.fillText(prog ? (done ? '목표 달성! 보내는 중' : `${kib(cur)} / ${kib(goal)}알`) : '- / 300알', x, by + bh + 44); ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.font = '21px Jua';
     const dog = prog ? prog.today_dog : 0, cat = prog ? prog.today_cat : 0;
-    ctx.fillText(`오늘 +${kib(prog ? prog.today : 0)}알 · 강아지팀 ${kib(dog)} vs 고양이팀 ${kib(cat)}`, x, by + bh + 76);
-    ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.font = '14px Jua';
-    ctx.fillText(`지금까지 보낸 것 ${kib(prog ? prog.sent : 0)}번 · 모두의 점수 ${everyone ? kib(everyone.total) : '-'}${myKibbles ? ` · 내가 모은 간식 ${myKibbles}알` : ''}`, x, by + bh + 100);
+    ctx.fillText(`오늘 +${kib(prog ? prog.today : 0)}알 · 강아지 ${kib(dog)} vs 고양이 ${kib(cat)}`, x, by + bh + 74);
+    ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.font = '21px Jua';
+    ctx.fillText(myKibbles ? `내가 모은 간식 ${myKibbles}알 · 보낼 곳은 정하는 중` : `보낸 횟수 ${kib(prog ? prog.sent : 0)}번 · 보낼 곳은 정하는 중`, x, by + bh + 102);
     // 인증 사진 액자 (전광판 오른쪽)
     const fx = x + w / 2 + 20, fy = top + 40, fw = 128, fh = 150;
     ctx.save(); ctx.translate(fx + fw / 2, fy + fh / 2); ctx.rotate(-0.05);
@@ -152,34 +153,34 @@
     R(ctx, r.x, r.y, r.w, r.h, 16); ctx.fillStyle = '#121A2E'; ctx.fill(); ctx.restore();
     ctx.strokeStyle = '#4FD1FF'; ctx.lineWidth = 4; R(ctx, r.x, r.y, r.w, r.h, 16); ctx.stroke();
     ctx.textAlign = 'center';
-    ctx.save(); ctx.shadowColor = '#FFD54A'; ctx.shadowBlur = 8; ctx.fillStyle = '#FFD54A'; ctx.font = '26px Jua'; ctx.fillText('순위 전광판', x, r.y + 36); ctx.restore();
-    ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.font = '13px Jua'; ctx.fillText('게임마다 각자 최고 점수 · 눌러서 크게 보기', x, r.y + 56);
+    ctx.save(); ctx.shadowColor = '#FFD54A'; ctx.shadowBlur = 8; ctx.fillStyle = '#FFD54A'; ctx.font = '30px Jua'; ctx.fillText('순위 전광판', x, r.y + 38); ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.font = '18px Jua'; ctx.fillText('각자 최고 점수 · 누르면 크게', x, r.y + 62);
     const MEDAL = ['#FFD54A', '#D9DEE8', '#E0A36B'];
     [['sacheon', '사천성'], ['peaks', '트라이피크']].forEach(([id, name], col) => {
       const cx = r.x + r.w * (col ? 0.75 : 0.25), left = cx - r.w * 0.23, right = cx + r.w * 0.23;
-      ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = '18px Jua'; ctx.fillText(name, cx, r.y + 84);
+      ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = '21px Jua'; ctx.fillText(name, cx, r.y + 90);
       const list = tops[id];
       for (let i = 0; i < 3; i++) {
-        const yy = r.y + 112 + i * 28, row = list && list[i];
+        const yy = r.y + 120 + i * 29, row = list && list[i];
         ctx.fillStyle = MEDAL[i]; ctx.beginPath(); ctx.arc(left + 10, yy - 6, 10, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#121A2E'; ctx.font = '14px Jua'; ctx.textAlign = 'center'; ctx.fillText(row ? row.rank : i + 1, left + 10, yy - 1);
-        ctx.textAlign = 'left'; ctx.font = '16px Jua';
+        ctx.textAlign = 'left'; ctx.font = '19px Jua';
         ctx.fillStyle = row && me.name && row.name === me.name ? '#FFD54A' : row ? '#fff' : 'rgba(255,255,255,.3)';
-        ctx.fillText(row ? cut(row.name, 6) : (i === 0 && list && !list.length ? '1등 비어 있음' : '-'), left + 26, yy);
+        ctx.fillText(row ? cut(row.name, 5) : (i === 0 && list && !list.length ? '1등 비었어' : '-'), left + 26, yy);
         if (row) { ctx.textAlign = 'right'; ctx.fillStyle = '#FFD54A'; ctx.fillText(kib(row.score), right, yy); }
       }
     });
-    ctx.strokeStyle = 'rgba(79,209,255,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, r.y + 70); ctx.lineTo(x, r.y + 178); ctx.stroke();
+    ctx.strokeStyle = 'rgba(79,209,255,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, r.y + 70); ctx.lineTo(x, r.y + 182); ctx.stroke();
     // 내 등수 줄
     const g = (id) => myRanks && myRanks.games && myRanks.games[id];
     let mine;
-    if (!me.name) mine = g('sacheon') || g('peaks') ? '별명을 정하면 내 등수도 여기 떠 (왼쪽 위 이름)' : '별명 정하고 한 판 하면 내 등수가 떠';
+    if (!me.name) mine = g('sacheon') || g('peaks') ? '별명 정하면 내 등수가 떠' : '별명 정하고 한 판 하면 내 등수';
     else {
       const part = (id, nm) => (g(id) && g(id).rank ? `${nm} ${g(id).rank}등` : `${nm} -`);
-      mine = `${cut(me.name, 8)} · ${part('sacheon', '사천성')} · ${part('peaks', '트라이피크')}`;
+      mine = `${cut(me.name, 6)} · ${part('sacheon', '사천성')} · ${part('peaks', '트라이피크')}`;
     }
     R(ctx, r.x + 16, r.y + r.h - 44, r.w - 32, 30, 10); ctx.fillStyle = Math.sin(t * 2) > -0.6 ? 'rgba(255,213,74,.16)' : 'rgba(255,213,74,.08)'; ctx.fill();
-    ctx.textAlign = 'center'; ctx.fillStyle = '#FFE58A'; ctx.font = '16px Jua'; ctx.fillText(mine, x, r.y + r.h - 23);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#FFE58A'; ctx.font = '19px Jua'; ctx.fillText(mine, x, r.y + r.h - 22);
   }
   const nearRank = () => isPlaza() && Math.abs(me.x - RANK.x) < RANK.w / 2 - 20 && me.y > RANK.y - 10 && me.y < RANK.y + 110;
   const openRank = () => document.getElementById('rankBtn').click();
@@ -198,14 +199,22 @@
     openGame = gm;
     document.getElementById('gameTitle').textContent = gm.name;
     document.getElementById('gameGive').textContent = '';
-    gameFrame.src = `${gm.url}&team=${BREEDS[me.breed]?.kind === 'cat' ? 'cat' : 'dog'}`;   // 강아지팀/고양이팀
+    setFrame(`${gm.url}&team=${BREEDS[me.breed]?.kind === 'cat' ? 'cat' : 'dog'}`);   // 강아지팀/고양이팀
     gameBox.classList.add('open'); window.plazaPaused = true;
+    if (typeof music !== 'undefined' && music.game) music.game(true);   // 게임 중엔 배경음악 쉼
+    if (typeof openLayer === 'function') openLayer(closeArcade);          // 폰 뒤로가기 = 게임 창만 닫기
     speech.set(myId, { text: `${gm.name} 하러 감`, until: Date.now() + 2500 });
+  }
+  // 게임 창 주소 바꾸기: 방문 기록을 남기지 않게 replace (기록이 쌓이면 뒤로가기가 게임 창 안에서만 돎)
+  function setFrame(url) {
+    try { gameFrame.contentWindow.location.replace(new URL(url, location.href).href); } catch { gameFrame.src = url; }
   }
   let pendingUnlock = null;   // 게임 중에 새로 풀린 소품 → 광장에 돌아오면 말풍선으로 알려 줌
   function closeArcade() {
+    if (!openGame) return;
     gameBox.classList.remove('open'); window.plazaPaused = false;
-    gameFrame.src = 'about:blank';   // 게임 화면이 닫히면서 남은 점수를 보냄 (pagehide)
+    if (typeof music !== 'undefined' && music.game) music.game(false);
+    setFrame('about:blank');   // 게임 화면이 닫히면서 남은 점수를 보냄 (pagehide)
     openGame = null; loadTotal(); setTimeout(loadRanks, 1500);   // 방금 낸 점수가 순위에 반영되게
     if (pendingUnlock) { speech.set(myId, { text: `${pendingUnlock.name} 풀렸다, 옷장 가 보자`, until: Date.now() + 3500 }); pendingUnlock = null; }
   }
@@ -214,7 +223,7 @@
     if (gm.soon) { speech.set(myId, { text: '뭐가 들어올지 아직 비밀이래', until: Date.now() + 2500 }); return; }
     openArcade(gm);
   };
-  document.getElementById('gameClose').onclick = closeArcade;
+  document.getElementById('gameClose').onclick = () => (typeof closeLayer === 'function' ? closeLayer(closeArcade) : closeArcade());
   addEventListener('message', (e) => {
     const d = e.data;
     if (d && d.type === 'doduk-name') { if (typeof setMyName === 'function') setMyName(d.name); setTimeout(loadRanks, 500); return; }   // 게임 결과창에서 별명을 정함
