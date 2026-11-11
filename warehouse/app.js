@@ -95,7 +95,7 @@ function doors() {
 // extras.js(미니게임·트리 등)가 끼어드는 자리: 광장 그리기, 매 프레임, 실시간 메시지
 const plazaHooks = [], frameHooks = [], extraHandlers = {};
 const peers = new Map();   // id → { breed, x, y, tx, ty, seq, seen, goneAt, act }
-const okBreed = (n) => (BREEDS[n] ? n : 0);   // 모르는 품종 번호(옛 화면·새 화면 섞임)는 0번으로
+const okBreed = (n) => (Number.isInteger(n) && BREEDS[n] ? n : 0);   // 모르는 품종 번호(옛 화면·새 화면 섞임)는 0번으로
 function onPeer(p) {
   if (p.id === myId) return;
   p.breed = okBreed(p.breed);
@@ -399,6 +399,20 @@ function setMyName(n) { if (!nameOk(n)) return; me.name = n; meChip.textContent 
 // 다른 폰·예전 기록에서 서버에 별명이 있으면 맞춤
 if (window.Score) Score.myInfo().then((r) => { if (r && r.ok && r.name && r.name !== me.name) { try { localStorage.setItem('doduk-name', JSON.stringify(r.name)); } catch {} setMyName(r.name); } });
 
+// ---------- 폰 뒤로가기: 열린 창(게임·순위판·옷장)만 닫고 오락실은 그대로 (예전엔 사이트를 나가 버림) ----------
+const layers = [];
+let skipPop = 0;
+function openLayer(close) { layers.push(close); try { history.pushState({ doduk: layers.length }, ''); } catch {} }
+// 화면의 닫기 버튼으로 닫을 때: 바로 닫고, 쌓아 둔 기록 한 칸도 같이 지움
+function closeLayer(close) {
+  const i = layers.lastIndexOf(close);
+  close();
+  if (i < 0) return;
+  layers.splice(i, 1); skipPop++;
+  try { history.back(); } catch { skipPop--; }
+}
+addEventListener('popstate', () => { if (skipPop) { skipPop--; return; } const c = layers.pop(); if (c) c(); });
+
 // ---------- 순위판: 게임마다 각자 최고 점수 ----------
 const rankEl = document.getElementById('rankBox'), rankList = document.getElementById('rankList');
 let rankGame = 'sacheon';
@@ -408,8 +422,9 @@ function renderRank() {
   else rankList.textContent = '아직 못 불러왔어';
 }
 rankEl.querySelectorAll('#rankTabs button').forEach((t) => { t.onclick = () => { rankGame = t.dataset.game; renderRank(); }; });
-document.getElementById('rankBtn').onclick = () => { rankEl.classList.add('open'); renderRank(); };
-document.getElementById('rankClose').onclick = () => rankEl.classList.remove('open');
+const closeRank = () => rankEl.classList.remove('open');
+document.getElementById('rankBtn').onclick = () => { if (!rankEl.classList.contains('open')) openLayer(closeRank); rankEl.classList.add('open'); renderRank(); };
+document.getElementById('rankClose').onclick = () => closeLayer(closeRank);
 
 // ---------- 옷장: 끝낸 게임 판 수만큼 소품이 풀림 (게임 쪽에서 doduk-games-done 을 올림) ----------
 const wardEl = document.getElementById('wardrobe');
@@ -446,8 +461,9 @@ function renderWardrobe() {
   }
   scroller.scrollTop = keep;   // 고를 때마다 맨 위로 튀지 않게
 }
-document.getElementById('wardBtn').onclick = () => { peekAcc = null; wardEl.classList.add('open'); renderWardrobe(); };
-document.getElementById('wardClose').onclick = () => { peekAcc = null; wardEl.classList.remove('open'); if (me.acc) speech.set(myId, { text: '어때', until: Date.now() + 1500 }); };
+const closeWard = () => { peekAcc = null; wardEl.classList.remove('open'); if (me.acc) speech.set(myId, { text: '어때', until: Date.now() + 1500 }); };
+document.getElementById('wardBtn').onclick = () => { peekAcc = null; if (!wardEl.classList.contains('open')) openLayer(closeWard); wardEl.classList.add('open'); renderWardrobe(); };
+document.getElementById('wardClose').onclick = () => closeLayer(closeWard);
 // 예전에 고른 소품이 아직 안 풀린 거면 벗김 (판 수 기준이 새로 생겨서)
 { const a = ACCESSORIES.find((x) => x.id === me.acc); if (a && gamesDone() < (a.need || 0)) { me.acc = ''; try { localStorage.setItem('doduk-acc', ''); } catch {} } }
 document.getElementById('talk').onclick = () => { phrasesEl.classList.toggle('open'); actionsEl.classList.remove('open'); };
@@ -480,7 +496,18 @@ function checkDoors() {
 
 // ---------- 조작: 바닥을 누르면 그쪽으로 걸어감 ----------
 const hint = document.getElementById('hint');
-canvas.addEventListener('pointerdown', (e) => {
+// 옛 브라우저(PointerEvent 없음, iOS 12 이하 등)는 touchstart·mousedown 으로 받음
+function floorTap(clientX, clientY) {
+  const r = canvas.getBoundingClientRect();
+  canvas.dispatchEvent(Object.assign(new Event('floortap'), { offsetX: clientX - r.left, offsetY: clientY - r.top }));
+}
+if (!window.PointerEvent) {
+  canvas.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; floorTap(t.clientX, t.clientY); }, { passive: true });
+  canvas.addEventListener('mousedown', (e) => floorTap(e.clientX, e.clientY));
+}
+canvas.addEventListener('floortap', (e) => onFloor(e));
+canvas.addEventListener('pointerdown', (e) => onFloor(e));
+function onFloor(e) {
   const { w, h } = size();
   const wx = (e.offsetX * dpr) / scale + camX;
   const wy = (e.offsetY * dpr) / scale + camY;
@@ -490,7 +517,7 @@ canvas.addEventListener('pointerdown', (e) => {
   net.send();
   hint.style.opacity = 0;
   phrasesEl.classList.remove('open'); actionsEl.classList.remove('open');
-});
+}
 
 // ---------- 상품 카드 ----------
 const sheet = document.getElementById('sheet');
@@ -1526,9 +1553,15 @@ function step(p, dt) {
 }
 
 let lastT = performance.now();
+// 한 장 그리다 오류가 나도 다음 장은 계속 그리게 (예전엔 오류 한 번에 광장이 통째로 멈춤)
+let frameErrShown = false;
 function frame(now) {
+  try { drawFrame(now); } catch (e) { if (!frameErrShown) { frameErrShown = true; console.error('광장 그리기 오류', e); } }
+  requestAnimationFrame(frame);
+}
+function drawFrame(now) {
   // 오락실 게임 창이 열려 있으면 광장은 쉬게 함 (폰에서 둘 다 그리면 느려짐)
-  if (window.plazaPaused) { lastT = now; requestAnimationFrame(frame); return; }
+  if (window.plazaPaused) { lastT = now; return; }
   const dt = Math.max(0, Math.min(0.05, (now - lastT) / 1000)); lastT = now;   // 시간이 거꾸로 오면(다른 시계 섞임) 0으로: 캐릭터가 반대로 튀어 나가지 않게
   const t = now / 1000;
   step(me, dt);
@@ -1608,7 +1641,6 @@ function frame(now) {
 
   const conn = '';   // 연결 상태(끊김·연결 중) 표시는 뺌 (대표님 11.10)
   document.getElementById('count').innerHTML = `<b>${peers.size + 1}</b>마리${conn}`;
-  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
@@ -1649,11 +1681,18 @@ const music = (() => {
     if (on) { if (!started) start(); else ac.resume(); } else if (ac) ac.suspend();
   }
   btn.onclick = (e) => { e.stopPropagation(); set(!on); };
-  // 첫 터치 때 켜기 (꺼둔 사람은 그대로)
-  const first = () => { if (on) start(); removeEventListener('pointerdown', first, true); };
-  addEventListener('pointerdown', first, true);
+  // 첫 터치 때 켜기 (꺼둔 사람은 그대로). 폰은 손가락을 뗄 때(touchend)·click 이 "사용자 동작"이라 그때 켜야 소리가 남
+  let inGame = false;
+  const first = () => {
+    if (!on || inGame) return;
+    start().then(() => { if (ac && ac.state === 'suspended' && on && !inGame) ac.resume(); });
+    if (started) { ['touchend', 'click', 'keydown'].forEach((ev) => removeEventListener(ev, first, true)); }
+  };
+  ['touchend', 'click', 'keydown'].forEach((ev) => addEventListener(ev, first, true));
   // 다른 앱으로 가면 소리 멈춤
-  document.addEventListener('visibilitychange', () => { if (!ac || !on) return; document.hidden ? ac.suspend() : ac.resume(); });
+  document.addEventListener('visibilitychange', () => { if (!ac || !on || inGame) return; document.hidden ? ac.suspend() : ac.resume(); });
   label();
-  return { set };
+  // 게임 창이 열리면 배경음악은 쉼 (게임 창이 "음악 끄기" 버튼을 덮고, 게임엔 효과음이 따로 있음)
+  function game(open) { inGame = open; if (!ac) return; if (open) ac.suspend(); else if (on) ac.resume(); }
+  return { set, game };
 })();
