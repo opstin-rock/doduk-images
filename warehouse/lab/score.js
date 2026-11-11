@@ -61,25 +61,41 @@ window.Score = (() => {
   if (team !== 'dog' && team !== 'cat') team = Math.random() < 0.5 ? 'dog' : 'cat';
   lsSet('doduk-team', team);
   const KPEND = 'doduk-pending-kibbles';
-  async function rpcKibble(game) {
+  // keepalive: 게임 창이 닫히는 순간(광장으로 나가기)에 보내도 요청이 끊기지 않게
+  // key: 알마다 붙이는 번호. 같은 알을 두 번 보내도 서버가 한 번만 셈 (supabase/kibble-guard.sql)
+  //      서버가 아직 옛 함수면(번호 칸 없음, 404) 번호 없이 다시 보냄
+  let keyOk = true;
+  async function rpcKibble(game, key) {
     if (!ready) return null;
+    const send = (withKey) => fetch(`${url}/rest/v1/rpc/add_kibble`, { method: 'POST', headers, keepalive: true,
+      body: JSON.stringify({ p_game: game, p_team: team, p_device: device, ...(withKey && key ? { p_key: key } : {}) }) });
     try {
-      const r = await fetch(`${url}/rest/v1/rpc/add_kibble`, { method: 'POST', headers, body: JSON.stringify({ p_game: game, p_team: team, p_device: device }) });
+      let r = await send(keyOk);
+      if (r.status === 404 && keyOk && key) { keyOk = false; r = await send(false); }
       return r.ok ? await r.json() : null;
     } catch { return null; }
   }
   // 결과: { ok: true, today } / { ok: false, reason: 'cap' } / null(못 보냄 → 이 폰에 모아 뒀다가 다시)
+  // 보내기 전에 먼저 "보낼 목록"에 적어 두고, 서버가 받았다고 답하면 지움 (창이 닫혀 답을 못 받아도 다음에 다시 보냄)
   async function kibble(game) {
-    const res = await rpcKibble(game);
-    if (!res) lsSet(KPEND, [...lsGet(KPEND, []), { game, day: today() }]);
+    const mark = { game, day: today(), id: `${device.slice(0, 8)}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}` };
+    lsSet(KPEND, [...lsGet(KPEND, []), mark]);
+    const res = await rpcKibble(game, mark.id);
+    // 서버가 받았으면 지움. 서버가 아직 옛 함수(번호로 중복을 못 거름)면 예전 방식: 못 보냈을 때만 번호 없이 다시 적음
+    if (res || !keyOk) lsSet(KPEND, lsGet(KPEND, []).filter((p) => p.id !== mark.id));
+    if (!res && !keyOk) lsSet(KPEND, [...lsGet(KPEND, []), { game, day: today(), id: `${mark.id}r` }]);
     if (window.parent !== window && res && res.ok) { try { window.parent.postMessage({ type: 'doduk-kibble', game, team, today: res.today }, '*'); } catch {} }
     return res;
   }
   async function flushKibbles() {
+    // 번호 없는 옛 기록(예전 score.js가 남긴 것)에도 번호를 붙여 둠 → 하나 실패하고 하나 성공해도 실패한 건 남게
+    lsSet(KPEND, lsGet(KPEND, []).map((p, i) => (p.id ? p : { ...p, id: `old${i}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}` })));
     const list = lsGet(KPEND, []).filter((p) => p.day === today());
     const left = [];
-    for (const p of list) { const r = await rpcKibble(p.game); if (!r) left.push(p); }
-    lsSet(KPEND, left);
+    for (const p of list) { const r = await rpcKibble(p.game, p.id); if (!r) left.push(p); }
+    // 그 사이 새로 적힌 알(다른 창에서 게임 중)은 지우지 않음
+    const sent = new Set(list.filter((p) => !left.includes(p)).map((p) => p.id));
+    lsSet(KPEND, lsGet(KPEND, []).filter((p) => p.day === today() && !sent.has(p.id)));
   }
   const progress = async () => { const j = await get('kibble_progress?select=total,sent,goal,current,today,today_dog,today_cat'); return j && j[0] ? j[0] : null; };
   const shipments = async () => (await get('shipments?select=round,item,shelter,photo_url,sent_at&order=round.desc&limit=5')) || [];
