@@ -111,6 +111,7 @@
   .pick .grid .need { position:absolute; top:3px; right:3px; background:var(--ink); color:#fff; font-size:10px; line-height:1; border-radius:8px; padding:3px 5px; }
   #wardInfo b { color:var(--red); }
   .pick .grid canvas { display:block; width:54px; height:54px; margin:0 auto 2px; }
+  .pick .grid .nm { display:block; line-height:1.15; word-break:keep-all; overflow-wrap:anywhere; }   /* 긴 이름은 띄어쓴 자리에서 두 줄, 그래도 넘치면 아무 데서나 줄바꿈 */
   .pick .row2 { display:flex; gap:8px; margin-top:6px; position:-webkit-sticky; position:sticky; bottom:0; background:#fff; padding:8px 0 14px; z-index:2; }
   .pick .row2 button { margin:0; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:13px 6px; }
   .pick .row2 .go { background:var(--ink); color:#fff; }
@@ -266,7 +267,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="pets.js?v=35"></script>
 <script src="lab/score.js?v=6"></script>
-<script src="app.js?v=39"></script>
+<script src="app.js?v=40"></script>
 <script src="extras.js?v=39"></script>
 </body>
 </html>
