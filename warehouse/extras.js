@@ -21,10 +21,10 @@
   // =====================================================================
   const GAMES = [
     // 광장 전체가 오락실 (2026-11-09). 앞줄: 지금 할 수 있는 게임, 뒷줄: 만드는 중 (불 꺼진 게임기)
-    { id: 'sacheon', name: '사천성', x: 560, y: 900, url: 'lab/link.html?embed=1&v=24', body: '#E8402F', screen: 'sacheon' },
-    { id: 'peaks', name: '트라이피크', x: 720, y: 900, url: 'lab/peaks.html?embed=1&v=19', body: '#3D7BD9', screen: 'peaks' },
+    { id: 'sacheon', name: '사천성', x: 560, y: 900, url: 'lab/link.html?embed=1&v=25', body: '#E8402F', screen: 'sacheon' },
+    { id: 'peaks', name: '트라이피크', x: 720, y: 900, url: 'lab/peaks.html?embed=1&v=20', body: '#3D7BD9', screen: 'peaks' },
     // 아직 안 연 게임은 이름을 숨김 (대표님 11.10: "???"로)
-    { id: 'dodge', name: '똥피하기', x: 880, y: 900, url: 'lab/dodge.html?embed=1&v=4', body: '#5FA86B', screen: 'dodge' },   // 11.11 대표님
+    { id: 'dodge', name: '똥피하기', x: 880, y: 900, url: 'lab/dodge.html?embed=1&v=5', body: '#5FA86B', screen: 'dodge' },   // 11.11 대표님
     { id: 'soon2', name: '???', x: 400, y: 1230, soon: true, body: '#8C7FA8' },
     { id: 'soon3', name: '???', x: 1040, y: 1230, soon: true, body: '#8C7FA8' },
   ];
@@ -86,7 +86,9 @@
     ctx.fillStyle = '#FFD54A'; ctx.fillText(gm.name, x, y + 28);
   }
   // 전광판: 다리 달린 큰 화면. y는 다리 밑동, 화면은 그 위
-  //   보호소에 간식 보내기: 한 판 = 간식 한 알(코인 1개), 300알마다 간식 1팩, 매월 초 한 박스로 (보낼 곳은 정하는 중)
+  //   보호소에 간식 보내기 (11.12 대표님): 한 판 = 간식 한 알(코인 1개), 300알 차면 1팩 보관하고 막대는 0부터,
+  //   안 차면 다음 달로 이어짐. 매월 초 보관 중인 팩을 한 박스로 (보낼 곳은 정하는 중)
+  //   숫자는 total·sent(보낸 팩)로 여기서 계산 (supabase/packs.sql 실행 전후 모두 맞게)
   //   왼쪽 액자: 최근 인증 사진 (shipments.photo_url)
   const kib = (n) => Number(n || 0).toLocaleString('ko-KR');
   // 막대 속 작은 간식 (뼈다귀 모양)
@@ -106,21 +108,23 @@
     ctx.textAlign = 'center';
     // 글씨는 폰(화면 폭 360)에서 반으로 줄어 보이므로 넉넉히 크게 (11.11 테스터: 7px라 안 읽힘)
     ctx.fillStyle = '#fff'; ctx.font = '30px Jua'; ctx.fillText('보호소에 간식 보내기', x, top + 48);
-    ctx.fillStyle = 'rgba(255,255,255,.82)'; ctx.font = '21px Jua'; ctx.fillText('한 판 = 간식 한 알 · 300알마다 간식 1팩', x, top + 78);
+    ctx.fillStyle = 'rgba(255,255,255,.82)'; ctx.font = '21px Jua'; ctx.fillText('한 판 = 한 알 · 300알 차면 1팩 보관', x, top + 78);
     // 진행 막대
-    const goal = prog ? prog.goal : 300, cur = prog ? Math.min(prog.current, goal) : 0, done = prog && prog.current >= goal;
+    const goal = 300, total = prog ? Number(prog.total) || 0 : 0, cur = total % goal, done = false;
+    const stored = prog ? Math.max(0, Math.floor(total / goal) - (Number(prog.sent) || 0)) : 0;
+    const kst = new Date(Date.now() + 9 * 3600000), nextMonth = kst.getUTCMonth() === 11 ? 1 : kst.getUTCMonth() + 2;
     const bx = x - w / 2 + 28, bw = w - 56, by = top + 90, bh = 30;
     R(ctx, bx, by, bw, bh, 17); ctx.fillStyle = '#2B2550'; ctx.fill();
     if (cur > 0) { R(ctx, bx, by, Math.max(34, bw * (cur / goal)), bh, 17); ctx.fillStyle = done ? (Math.sin(t * 6) > 0 ? '#FFD54A' : '#FF8A3D') : '#C9965F'; ctx.fill(); }
     for (let i = 0; i < Math.min(14, Math.floor((bw * (cur / goal)) / 26)); i++) drawKibble(bx + 16 + i * 26, by + bh / 2, 7, i % 2 ? '#FFF6E6' : '#FFE0B8');   // 막대 속 사료알
     ctx.strokeStyle = '#FFD54A'; ctx.lineWidth = 2; R(ctx, bx, by, bw, bh, 17); ctx.stroke();
     ctx.save(); ctx.shadowColor = '#FFD54A'; ctx.shadowBlur = 10; ctx.fillStyle = '#FFD54A'; ctx.font = '42px Jua';
-    ctx.fillText(prog ? (done ? '목표 달성! 보내는 중' : `${kib(cur)} / ${kib(goal)}알`) : '- / 300알', x, by + bh + 44); ctx.restore();
+    ctx.fillText(prog ? `${kib(cur)} / ${kib(goal)}알` : '- / 300알', x, by + bh + 44); ctx.restore();
     ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.font = '21px Jua';
     const dog = prog ? prog.today_dog : 0, cat = prog ? prog.today_cat : 0;
     ctx.fillText(`오늘 +${kib(prog ? prog.today : 0)}알 · 강아지 ${kib(dog)} vs 고양이 ${kib(cat)}`, x, by + bh + 74);
     ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.font = '21px Jua';
-    ctx.fillText(myKibbles ? `내가 모은 간식 ${myKibbles}알 · 보낼 곳은 정하는 중` : `보낸 횟수 ${kib(prog ? prog.sent : 0)}번 · 보낼 곳은 정하는 중`, x, by + bh + 102);
+    ctx.fillText(stored ? `보관 중 ${kib(stored)}팩 · ${nextMonth}월 1일 보호소로` : `첫 팩이 차면 매월 1일 보호소로`, x, by + bh + 102);
     // 인증 사진 액자 (전광판 오른쪽)
     const fx = x + w / 2 + 20, fy = top + 40, fw = 128, fh = 150;
     ctx.save(); ctx.translate(fx + fw / 2, fy + fh / 2); ctx.rotate(-0.05);
@@ -245,7 +249,7 @@
     }
     if (d && d.type === 'doduk-kibble') {   // 간식 한 알 모음 → 전광판 막대 바로 올리기
       myKibbles++;
-      if (prog) { prog = { ...prog, total: prog.total + 1, current: prog.current + 1, today: prog.today + 1, [d.team === 'cat' ? 'today_cat' : 'today_dog']: (prog[d.team === 'cat' ? 'today_cat' : 'today_dog'] || 0) + 1 }; }
+      if (prog) { prog = { ...prog, total: Number(prog.total) + 1, today: prog.today + 1, [d.team === 'cat' ? 'today_cat' : 'today_dog']: (prog[d.team === 'cat' ? 'today_cat' : 'today_dog'] || 0) + 1 }; }
       if (typeof setCoins === 'function') setCoins(d.coins);
       document.getElementById('gameGive').textContent = coinNow() === null ? `간식 +${myKibbles}알` : `간식 +${myKibbles}알 · 코인 ${coinNow()}`;
       setTimeout(loadTotal, 1500);
