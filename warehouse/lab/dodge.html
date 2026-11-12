@@ -81,8 +81,8 @@
     <li>위에서 <b>똥</b>이 떨어져. 화면을 누른 채 <b>좌우로 밀어서</b> 피해 (키보드는 화살표)</li>
     <li>목숨은 <b>3개</b>. 맞으면 하나 줄고 잠깐 반짝이는 동안은 안 맞아</li>
     <li>오래 버틸수록 점수가 올라. 똥이 <b>아슬아슬하게</b> 스치면 보너스</li>
-    <li><b>뼈다귀</b>를 주우면 점수, <b>빗자루</b>를 주우면 화면의 똥이 싹 치워져</li>
-    <li>15초마다 한 단계씩 <b>빨라져</b></li>
+    <li><b>뼈다귀</b>는 점수, <b>빗자루</b>는 화면의 똥을 싹 치움, <b>하트</b>는 목숨 하나 (4단계부터)</li>
+    <li><b>12초</b>마다 빨라지고 방해꾼이 늘어: 비둘기, 쪼개지는 큰 똥, <b>빨간 줄</b>이 뜨면 번개 똥, 끈적한 웅덩이, 바람, 빈칸 하나 남은 똥 소나기</li>
   </ol>
   <button class="main" id="startBtn">시작</button>
 </div></div>
@@ -154,6 +154,8 @@
   let running = false, paused = false, over = false, started = false;
   let px = WW / 2, vx = 0, face = 1, targetX = null, keyDir = 0;
   let poops = [], items = [], parts = [], floats = [], splats = [];
+  // 11.12 방해꾼: 비둘기, 경고(번개 똥·소나기), 끈적한 웅덩이, 바람
+  let birds = [], warns = [], puddles = [], wind = null, nextBird = 3, nextWarn = 2, nextWind = 4, nextWave = 6, stickyNote = 0;
   let time = 0, score = 0, lives = 3, level = 1, invUntil = 0, nextPoop = 0, nextItem = 4, shakeT = 0, hitFlash = 0, dodged = 0, nearMiss = 0, bones = 0;
   const FLOOR = () => WH - 40;
   const rnd = (a, b) => a + Math.random() * (b - a);
@@ -179,18 +181,21 @@
   addEventListener('keyup', (e) => { if ((e.key === 'ArrowLeft' && keyDir < 0) || (e.key === 'ArrowRight' && keyDir > 0)) keyDir = 0; });
 
   // ---------- 난이도 (15초마다 한 단계) ----------
+  const LEVEL_SEC = 12;
   const diff = () => {
     const L = level;
-    return { gap: Math.max(0.2, 0.78 - L * 0.07), speed: 150 + L * 32, bigChance: L >= 3 ? 0.15 + L * 0.02 : 0, swayChance: L >= 4 ? 0.2 : 0, multi: L >= 5 ? 0.25 : 0 };
+    return { gap: Math.max(0.15, 0.62 - L * 0.045), speed: 175 + L * 28, bigChance: L >= 3 ? 0.2 : 0, splitChance: L >= 3 ? 0.4 : 0, swayChance: L >= 5 ? 0.22 : 0, multi: L >= 4 ? Math.min(0.5, 0.15 + L * 0.03) : 0 };
   };
-  function spawnPoop() {
-    const d = diff(), big = Math.random() < d.bigChance, r = big ? 19 : 13;
-    poops.push({ x: rnd(r + 4, WW - r - 4), y: -r - 10, vy: d.speed * rnd(0.85, 1.2), r, sway: Math.random() < d.swayChance ? rnd(30, 60) : 0, ph: rnd(0, 6), rot: rnd(-0.3, 0.3), near: false });
+  function spawnPoop(o = {}) {
+    const d = diff(), big = !o.r && Math.random() < d.bigChance, r = o.r || (big ? 19 : 13);
+    poops.push({ x: o.x ?? rnd(r + 4, WW - r - 4), y: o.y ?? -r - 10, vy: o.vy ?? d.speed * rnd(0.85, 1.2), vx: o.vx || 0, r, sway: o.sway ?? (Math.random() < d.swayChance ? rnd(30, 60) : 0),
+      ph: rnd(0, 6), rot: rnd(-0.3, 0.3), near: false, split: big && Math.random() < d.splitChance, fast: !!o.fast });
   }
   function spawnItem() {
-    const broom = time > 20 && Math.random() < 0.3;
-    items.push({ kind: broom ? 'broom' : 'bone', x: rnd(24, WW - 24), y: -20, vy: 120 + level * 10, ph: rnd(0, 6) });
+    const r = Math.random(), heart = level >= 4 && lives < 3 && r < 0.22, broom = !heart && time > 20 && r < 0.45;
+    items.push({ kind: heart ? 'heart' : broom ? 'broom' : 'bone', x: rnd(24, WW - 24), y: -20, vy: 120 + level * 10, ph: rnd(0, 6) });
   }
+  const LV_MSG = { 2: '비둘기가 똥을 흘리고 가', 3: '큰 똥은 공중에서 쪼개져', 4: '빨간 줄이 뜨면 번개 똥. 큰 똥 자국은 끈적해', 5: '바람이 불면 똥이 옆으로 날려', 6: '똥 소나기. 빈칸으로 피해' };
 
   // ---------- 그리기 ----------
   const OUTC = '#3b2b25';
@@ -217,6 +222,31 @@
     g.strokeStyle = 'rgba(59,43,37,.5)'; g.lineWidth = 1; for (const dx of [-6, -2, 2, 6]) { g.beginPath(); g.moveTo(dx * 0.6, 2); g.lineTo(dx, 15); g.stroke(); }
     g.restore();
   }
+  function drawHeart(x, y, t) {
+    const s = 9 + Math.sin(t * 6) * 0.8; g.save(); g.translate(x, y); g.fillStyle = '#F06A86'; g.strokeStyle = OUTC; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(0, s * 0.8); g.bezierCurveTo(-s * 1.6, -s * 0.2, -s * 0.7, -s * 1.4, 0, -s * 0.45); g.bezierCurveTo(s * 0.7, -s * 1.4, s * 1.6, -s * 0.2, 0, s * 0.8); g.fill(); g.stroke(); g.restore();
+  }
+  function drawBird(b, t) {   // 비둘기: 회색 몸, 날갯짓
+    g.save(); g.translate(b.x, b.y); g.scale(b.vx > 0 ? 1 : -1, 1); g.strokeStyle = OUTC; g.lineWidth = 2;
+    g.fillStyle = '#9AA3B0'; g.beginPath(); g.ellipse(0, 0, 15, 9, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.beginPath(); g.arc(13, -6, 6.5, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = '#F2C14E'; g.beginPath(); g.moveTo(19, -6); g.lineTo(25, -4); g.lineTo(19, -3); g.closePath(); g.fill();
+    g.fillStyle = OUTC; g.beginPath(); g.arc(15, -7, 1.4, 0, Math.PI * 2); g.fill();
+    const flap = Math.sin(t * 18) * 0.6; g.fillStyle = '#7F8896'; g.save(); g.rotate(-0.3 + flap); g.beginPath(); g.ellipse(-2, -6, 12, 5, -0.4, 0, Math.PI * 2); g.fill(); g.stroke(); g.restore();
+    g.restore();
+  }
+  function drawWarn(w, t) {
+    const blink = Math.floor(t * 10) % 2 ? 1 : 0.55;
+    if (w.wave) {   // 소나기: 맨 위에 줄, 빈칸은 초록
+      g.fillStyle = `rgba(232,64,47,${0.35 * blink})`; g.fillRect(0, 0, WW, 16);
+      g.fillStyle = 'rgba(95,168,107,.85)'; g.fillRect(w.gx - w.gapW / 2, 0, w.gapW, 16);
+      g.fillStyle = '#fff'; g.font = '13px Jua'; g.textAlign = 'center'; g.fillText('여기로', w.gx, 12);
+      return;
+    }
+    g.save(); g.globalAlpha = blink; g.strokeStyle = '#E8402F'; g.lineWidth = 3; g.setLineDash([8, 7]);
+    g.beginPath(); g.moveTo(w.x, 0); g.lineTo(w.x, FLOOR()); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#E8402F'; g.beginPath(); g.arc(w.x, 18, 11, 0, Math.PI * 2); g.fill(); g.fillStyle = '#fff'; g.font = '16px Jua'; g.textAlign = 'center'; g.fillText('!', w.x, 24); g.restore();
+  }
   function drawScene(t) {
     g.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
     let sx = 0, sy = 0; if (shakeT > 0) { sx = rnd(-4, 4) * shakeT * 3; sy = rnd(-3, 3) * shakeT * 3; }
@@ -230,7 +260,12 @@
     g.fillStyle = '#B98D57'; g.fillRect(-10, fy, WW + 20, 5);
     // 바닥에 떨어진 똥 자국
     for (const s of splats) { g.globalAlpha = Math.max(0, s.life); g.fillStyle = '#8B5A2B'; g.beginPath(); g.ellipse(s.x, fy + 4, s.r * 1.2, s.r * 0.35, 0, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; }
-    for (const it of items) it.kind === 'bone' ? drawBone(it.x, it.y, t + it.ph) : drawBroom(it.x, it.y, t + it.ph);
+    for (const pd of puddles) { g.globalAlpha = Math.min(1, pd.life); g.fillStyle = '#6E4320'; g.strokeStyle = OUTC; g.lineWidth = 2; g.beginPath(); g.ellipse(pd.x, fy + 6, pd.w / 2, 7, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(pd.x - pd.w * 0.15, fy + 4, pd.w * 0.15, 2.5, 0, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; }
+    if (wind) { g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 2.5; for (let i = 0; i < 9; i++) { const y = 40 + i * (FLOOR() - 60) / 9, x = ((t * 260 * wind.dir + i * 97) % (WW + 80) + WW + 80) % (WW + 80) - 40; g.beginPath(); g.moveTo(x, y); g.lineTo(x - wind.dir * 34, y); g.stroke(); } }
+    for (const w of warns) drawWarn(w, t);
+    for (const b of birds) drawBird(b, t);
+    for (const it of items) it.kind === 'bone' ? drawBone(it.x, it.y, t + it.ph) : it.kind === 'heart' ? drawHeart(it.x, it.y, t + it.ph) : drawBroom(it.x, it.y, t + it.ph);
     // 내 캐릭터 (맞은 뒤 무적일 때 깜빡)
     const inv = time < invUntil;
     if (!inv || Math.floor(t * 12) % 2) {
@@ -256,30 +291,59 @@
   function step(dt) {
     if (!running) return;
     time += dt;
-    const nl = Math.min(12, 1 + Math.floor(time / 15));
-    if (nl > level) { level = nl; toast(`${level}단계, 빨라졌어`); Sfx.bonus(); Haptic.combo(3); }
+    const nl = Math.min(15, 1 + Math.floor(time / LEVEL_SEC));
+    if (nl > level) { level = nl; toast(`${level}단계 · ${LV_MSG[level] || '더 빨라졌어'}`); Sfx.bonus(); Haptic.combo(3); }
     // 이동
     let want = 0;
     if (targetX !== null) { const d = targetX - px; want = Math.abs(d) < 3 ? 0 : Math.sign(d) * Math.min(1, Math.abs(d) / 40); }
     else want = keyDir;
-    const MAXV = 330;
+    const sticky = puddles.some((pd) => Math.abs(pd.x - px) < pd.w / 2 + 6);   // 끈적한 웅덩이 위에선 느려짐
+    if (sticky && time > stickyNote) { stickyNote = time + 2; float('끈적', px, FLOOR() - PH - 8, '#8B5A2B', 18); }
+    const MAXV = sticky ? 140 : 330;
     vx += (want * MAXV - vx) * Math.min(1, dt * 14);
-    px = Math.max(18, Math.min(WW - 18, px + vx * dt));
+    px = Math.max(30, Math.min(WW - 30, px + vx * dt + (wind ? wind.dir * 38 * dt : 0)));
     if (Math.abs(vx) > 20) face = Math.sign(vx);
     // 떨어지는 것
     nextPoop -= dt;
     if (nextPoop <= 0) { const d = diff(); spawnPoop(); if (Math.random() < d.multi) spawnPoop(); nextPoop = d.gap * rnd(0.75, 1.25); }
     nextItem -= dt; if (nextItem <= 0) { spawnItem(); nextItem = rnd(6, 10); }
+    // 비둘기 (2단계부터): 화면을 가로지르며 똥을 줄줄이
+    if (level >= 2 && (nextBird -= dt) <= 0) { const dir = Math.random() < 0.5 ? 1 : -1; birds.push({ x: dir > 0 ? -30 : WW + 30, y: rnd(50, 95), vx: dir * rnd(110, 150), drop: 0.4 }); nextBird = rnd(6, 9) - Math.min(3, level * 0.2); }
+    for (let i = birds.length - 1; i >= 0; i--) {
+      const b = birds[i]; b.x += b.vx * dt; b.drop -= dt;
+      if (b.drop <= 0 && b.x > 12 && b.x < WW - 12) { spawnPoop({ x: b.x, y: b.y + 10, r: 10, vy: 130, sway: 0 }); b.drop = Math.max(0.28, 0.5 - level * 0.02); }
+      if (b.x < -50 || b.x > WW + 50) birds.splice(i, 1);
+    }
+    // 번개 똥 (4단계부터): 빨간 줄로 먼저 알려 주고 아주 빠르게. 내 근처를 노림
+    if (level >= 4 && (nextWarn -= dt) <= 0) { warns.push({ x: Math.max(16, Math.min(WW - 16, px + rnd(-50, 50))), t: 0.75 }); nextWarn = Math.max(1.4, rnd(2.5, 4.5) - (level - 4) * 0.15); }
+    // 똥 소나기 (6단계부터): 한 줄로 쏟아지는데 빈칸 하나
+    if (level >= 6 && (nextWave -= dt) <= 0) { const gapW = Math.max(56, 84 - (level - 6) * 4); warns.push({ wave: true, gx: rnd(gapW / 2 + 10, WW - gapW / 2 - 10), gapW, t: 1.1 }); nextWave = rnd(13, 17); }
+    for (let i = warns.length - 1; i >= 0; i--) {
+      const w = warns[i]; w.t -= dt; if (w.t > 0) continue;
+      warns.splice(i, 1);
+      if (w.wave) { for (let x = 14; x <= WW - 14; x += 26) if (Math.abs(x - w.gx) > w.gapW / 2) spawnPoop({ x, r: 12, vy: diff().speed * 0.95, sway: 0 }); Sfx.shuffle(); }
+      else { spawnPoop({ x: w.x, r: 12, vy: 720, fast: true, sway: 0 }); Sfx.flip(); }
+    }
+    // 바람 (5단계부터): 4초 동안 똥과 나를 한쪽으로
+    if (level >= 5) { if (!wind && (nextWind -= dt) <= 0) { wind = { dir: Math.random() < 0.5 ? -1 : 1, until: time + 4 }; toast(wind.dir > 0 ? '바람이 오른쪽으로' : '바람이 왼쪽으로'); nextWind = rnd(9, 13); } if (wind && time > wind.until) wind = null; }
+    for (const pd of puddles) pd.life -= dt; puddles = puddles.filter((pd) => pd.life > 0);
     const H = hitHead(), B = hitBody(), fy = FLOOR();
     for (let i = poops.length - 1; i >= 0; i--) {
-      const p = poops[i]; p.y += p.vy * dt; p.ph += dt; if (p.sway) p.x = Math.max(p.r, Math.min(WW - p.r, p.x + Math.cos(p.ph * 3) * p.sway * dt));
+      const p = poops[i]; p.y += p.vy * dt; p.ph += dt;
+      p.x += ((p.vx || 0) + (wind ? wind.dir * 75 : 0) + (p.sway ? Math.cos(p.ph * 3) * p.sway : 0)) * dt; p.x = Math.max(p.r, Math.min(WW - p.r, p.x));
+      if (p.split && p.y > WH * 0.36) {   // 큰 똥이 공중에서 셋으로 쪼개짐
+        poops.splice(i, 1); burst(p.x, p.y, '#A9713C', 8, 120); Sfx.select();
+        for (const vx of [-95, 0, 95]) spawnPoop({ x: p.x, y: p.y, r: 11, vy: p.vy * 0.9, vx, sway: 0 });
+        continue;
+      }
       const hr = p.r * 0.75;
       const dh = dist(p, H) - H.r - hr, db = dist(p, B) - B.r - hr;
       if ((dh < 0 || db < 0) && time >= invUntil) { poops.splice(i, 1); hit(p); continue; }
       if (!p.near && Math.min(dh, db) < 10 && Math.min(dh, db) >= 0 && p.y > H.y - 10) { p.near = true; }
       if (p.y > fy - p.r * 0.3) {
-        poops.splice(i, 1); dodged++; score += 5;
+        poops.splice(i, 1); dodged++; score += 4 + level;
         splats.push({ x: p.x, r: p.r, life: 1 }); burst(p.x, fy, '#8B5A2B', 4, 90);
+        if (p.r >= 19 && level >= 4 && puddles.length < 3) puddles.push({ x: p.x, w: 46, life: 5 });   // 큰 똥 자국은 끈적한 웅덩이
         if (p.near) { nearMiss++; score += 15; float('아슬아슬 +15', p.x, fy - 70, '#FF8A3D', 18); Sfx.select(); Haptic.combo(1); }
       }
     }
@@ -287,13 +351,14 @@
       const it = items[i]; it.y += it.vy * dt;
       if (dist(it, B) < B.r + 16 || dist(it, H) < H.r + 16) {
         items.splice(i, 1);
-        if (it.kind === 'bone') { bones++; score += 30; float('뼈다귀 +30', it.x, it.y - 10, '#C98A47', 20); burst(it.x, it.y, '#FFE0B8', 10, 140); Sfx.bonus(); Haptic.combo(2); }
-        else { const n = poops.length; for (const p of poops) burst(p.x, p.y, '#A9713C', 5, 120); score += n * 10; poops = []; float(`싹 치움 +${n * 10}`, WW / 2, WH * 0.4, '#3D7BD9', 26); Sfx.shuffle(); Haptic.big(); }
+        if (it.kind === 'heart') { lives = Math.min(3, lives + 1); float('목숨 +1', it.x, it.y - 10, '#E8402F', 22); burst(it.x, it.y, '#F9A8C0', 12, 150); Sfx.bonus(); Haptic.combo(3); }
+        else if (it.kind === 'bone') { bones++; score += 30; float('뼈다귀 +30', it.x, it.y - 10, '#C98A47', 20); burst(it.x, it.y, '#FFE0B8', 10, 140); Sfx.bonus(); Haptic.combo(2); }
+        else { const n = poops.length; for (const p of poops) burst(p.x, p.y, '#A9713C', 5, 120); score += n * 10; poops = []; warns = []; puddles = []; float(`싹 치움 +${n * 10}`, WW / 2, WH * 0.4, '#3D7BD9', 26); Sfx.shuffle(); Haptic.big(); }
         continue;
       }
       if (it.y > fy) items.splice(i, 1);
     }
-    score += dt * 10;
+    score += dt * 10 * (1 + (level - 1) * 0.15);   // 높은 단계일수록 시간 점수도 많이
     for (const s of splats) s.life -= dt * 0.6; splats = splats.filter((s) => s.life > 0);
     for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 400 * dt; p.life -= dt * 1.6; } parts = parts.filter((p) => p.life > 0);
     for (const f of floats) { f.y -= 40 * dt; f.life -= dt * 0.9; } floats = floats.filter((f) => f.life > 0);
@@ -342,6 +407,7 @@
   // ---------- 시작·멈춤·버튼 ----------
   function start() {
     poops = []; items = []; parts = []; floats = []; splats = [];
+    birds = []; warns = []; puddles = []; wind = null; nextBird = 3; nextWarn = 2; nextWind = 4; nextWave = 6; stickyNote = 0;
     time = 0; score = 0; lives = 3; level = 1; invUntil = 0; nextPoop = 0.8; nextItem = 4; dodged = 0; nearMiss = 0; bones = 0;
     clearTimeout(endTimer); document.getElementById('endBox').classList.remove('open');
     px = WW / 2; vx = 0; targetX = null; keyDir = 0; sent = 0; kibbleDone = false; over = false; started = true; running = true; paused = false;
@@ -388,7 +454,8 @@
     requestAnimationFrame(frame);
   }
   updateHud(); requestAnimationFrame(frame);
-  window.__dodge = { get state() { return { time, score, lives, level, poops: poops.length, px }; }, start, step, hitHead, hitBody };   // 시험용
+  window.__dodge = { get state() { return { time, score, lives, level, poops: poops.length, px }; }, start, step, hitHead, hitBody,
+    get list() { return { poops, warns, birds, puddles, wind }; }, setTarget: (x) => { targetX = x; }, get WH() { return WH; }, floor: FLOOR };   // 시험용
 })();
 </script>
 </body>
