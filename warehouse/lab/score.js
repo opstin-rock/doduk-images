@@ -51,7 +51,7 @@ window.Score = (() => {
   const mine = () => lsGet(MINE, 0);
   const fmt = (n) => Number(n).toLocaleString('ko-KR');
 
-  // ---------- 사료알: 게임 한 판 끝내면 한 알 (폰 하나당 하루 20알, 서버 add_kibble 함수가 확인) ----------
+  // ---------- 사료알: 게임 한 판 끝내면 한 알, 코인 1개 씀 (폰 하나당 하루 20알 상한도 그대로, 서버 add_kibble 함수가 확인) ----------
   // 폰마다 무작위 번호 하나 (누구인지 알 수 없음. 하루 상한 세는 데만 씀)
   let device = lsGet('doduk-device', null);
   if (!device) { device = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`).replace(/-/g, '').slice(0, 32); lsSet('doduk-device', device); }
@@ -84,9 +84,21 @@ window.Score = (() => {
     // 서버가 받았으면 지움. 서버가 아직 옛 함수(번호로 중복을 못 거름)면 예전 방식: 못 보냈을 때만 번호 없이 다시 적음
     if (res || !keyOk) lsSet(KPEND, lsGet(KPEND, []).filter((p) => p.id !== mark.id));
     if (!res && !keyOk) lsSet(KPEND, [...lsGet(KPEND, []), { game, day: today(), id: `${mark.id}r` }]);
-    if (window.parent !== window && res && res.ok) { try { window.parent.postMessage({ type: 'doduk-kibble', game, team, today: res.today }, '*'); } catch {} }
+    if (window.parent !== window && res && res.ok && !res.dup) { try { window.parent.postMessage({ type: 'doduk-kibble', game, team, today: res.today, coins: res.coins }, '*'); } catch {} }
+    else if (window.parent !== window && res && typeof res.coins === 'number') { try { window.parent.postMessage({ type: 'doduk-coins', coins: res.coins }, '*'); } catch {} }
     return res;
   }
+  // ---------- 코인 (supabase/coins.sql, 11.12): 하루 무료 3개, 간식 한 알 받을 때 1개씩 씀 ----------
+  // 결과: { ok, coins, free, bonus, free_per_day, ads_on, ads_today, ads_left } / null(못 불러옴, 서버에 아직 코인이 없을 때도)
+  const coins = () => rpc('coin_status', { p_device: device });
+  // 광고를 끝까지 본 뒤 부름 (광고가 켜져 있을 때만 서버가 +1)
+  const adCoin = () => rpc('grant_ad', { p_device: device, p_key: `${device.slice(0, 8)}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}` });
+  // 게임 결과창 "보호소 간식 한 알" 칸 문구 (게임 셋 공용). before = 아직 조건을 못 채웠을 때 문구
+  const kibbleMsg = (r, before) => r === undefined ? before
+    : r && r.ok ? (typeof r.coins === 'number' ? `+1 (코인 ${r.coins}개 남음)` : `+1 (오늘 ${r.today}/20)`)
+    : r && r.reason === 'nocoin' ? '코인 없음, 내일 다시'
+    : r && r.reason === 'cap' ? '오늘 20알 다 모았어'
+    : r && (r.reason === 'ipcap' || r.reason === 'daycap') ? '오늘은 여기까지 받을 수 있어' : '나중에 다시 보낼게';
   async function flushKibbles() {
     // 번호 없는 옛 기록(예전 score.js가 남긴 것)에도 번호를 붙여 둠 → 하나 실패하고 하나 성공해도 실패한 건 남게
     lsSet(KPEND, lsGet(KPEND, []).map((p, i) => (p.id ? p : { ...p, id: `old${i}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}` })));
@@ -207,6 +219,6 @@ window.Score = (() => {
     : reason === 'net' ? '연결이 안 돼. 잠시 뒤에 다시 해 줘' : '2~8자 한글·영문·숫자로 해 줘 (안 되는 말도 있어)';
 
   flush(); flushKibbles(); flushBest();
-  return { send, flush, total, byGame, mine, fmt, kibble, progress, shipments, gameDone, gamesDone: () => lsGet('doduk-games-done', 0), get team() { return team; },
+  return { send, flush, total, byGame, mine, fmt, kibble, kibbleMsg, coins, adCoin, progress, shipments, gameDone, gamesDone: () => lsGet('doduk-games-done', 0), get team() { return team; },
     best, board, myInfo, setName, myName, nameOk, nameMsg, renderBoard, GAME_NAME };
 })();
