@@ -21,10 +21,10 @@
   // =====================================================================
   const GAMES = [
     // 광장 전체가 오락실 (2026-11-09). 앞줄: 지금 할 수 있는 게임, 뒷줄: 만드는 중 (불 꺼진 게임기)
-    { id: 'sacheon', name: '사천성', x: 560, y: 900, url: 'lab/link.html?embed=1&v=23', body: '#E8402F', screen: 'sacheon' },
-    { id: 'peaks', name: '트라이피크', x: 720, y: 900, url: 'lab/peaks.html?embed=1&v=18', body: '#3D7BD9', screen: 'peaks' },
+    { id: 'sacheon', name: '사천성', x: 560, y: 900, url: 'lab/link.html?embed=1&v=24', body: '#E8402F', screen: 'sacheon' },
+    { id: 'peaks', name: '트라이피크', x: 720, y: 900, url: 'lab/peaks.html?embed=1&v=19', body: '#3D7BD9', screen: 'peaks' },
     // 아직 안 연 게임은 이름을 숨김 (대표님 11.10: "???"로)
-    { id: 'dodge', name: '똥피하기', x: 880, y: 900, url: 'lab/dodge.html?embed=1&v=3', body: '#5FA86B', screen: 'dodge' },   // 11.11 대표님
+    { id: 'dodge', name: '똥피하기', x: 880, y: 900, url: 'lab/dodge.html?embed=1&v=4', body: '#5FA86B', screen: 'dodge' },   // 11.11 대표님
     { id: 'soon2', name: '???', x: 400, y: 1230, soon: true, body: '#8C7FA8' },
     { id: 'soon3', name: '???', x: 1040, y: 1230, soon: true, body: '#8C7FA8' },
   ];
@@ -86,7 +86,7 @@
     ctx.fillStyle = '#FFD54A'; ctx.fillText(gm.name, x, y + 28);
   }
   // 전광판: 다리 달린 큰 화면. y는 다리 밑동, 화면은 그 위
-  //   보호소에 간식 보내기: 한 판 = 사료 한 알, 300알마다 사료나 간식 1개 (보낼 곳은 정하는 중)
+  //   보호소에 간식 보내기: 한 판 = 간식 한 알(코인 1개), 300알마다 간식 1팩, 매월 초 한 박스로 (보낼 곳은 정하는 중)
   //   왼쪽 액자: 최근 인증 사진 (shipments.photo_url)
   const kib = (n) => Number(n || 0).toLocaleString('ko-KR');
   // 막대 속 작은 간식 (뼈다귀 모양)
@@ -106,7 +106,7 @@
     ctx.textAlign = 'center';
     // 글씨는 폰(화면 폭 360)에서 반으로 줄어 보이므로 넉넉히 크게 (11.11 테스터: 7px라 안 읽힘)
     ctx.fillStyle = '#fff'; ctx.font = '30px Jua'; ctx.fillText('보호소에 간식 보내기', x, top + 48);
-    ctx.fillStyle = 'rgba(255,255,255,.82)'; ctx.font = '21px Jua'; ctx.fillText('게임 한 판 = 간식 한 알 · 300알마다 간식 1개', x, top + 78);
+    ctx.fillStyle = 'rgba(255,255,255,.82)'; ctx.font = '21px Jua'; ctx.fillText('한 판 = 간식 한 알 · 300알마다 간식 1팩', x, top + 78);
     // 진행 막대
     const goal = prog ? prog.goal : 300, cur = prog ? Math.min(prog.current, goal) : 0, done = prog && prog.current >= goal;
     const bx = x - w / 2 + 28, bw = w - 56, by = top + 90, bh = 30;
@@ -205,7 +205,7 @@
   function openArcade(gm) {
     openGame = gm;
     document.getElementById('gameTitle').textContent = gm.name;
-    document.getElementById('gameGive').textContent = '';
+    document.getElementById('gameGive').textContent = coinText();
     setFrame(`${gm.url}&team=${BREEDS[me.breed]?.kind === 'cat' ? 'cat' : 'dog'}`);   // 강아지팀/고양이팀
     gameBox.classList.add('open'); window.plazaPaused = true;
     if (typeof music !== 'undefined' && music.game) music.game(true);   // 게임 중엔 배경음악 쉼
@@ -216,13 +216,16 @@
   function setFrame(url) {
     try { gameFrame.contentWindow.location.replace(new URL(url, location.href).href); } catch { gameFrame.src = url; }
   }
+  // 게임 창 위 막대에 남은 코인 (광장 app.js 의 coinInfo)
+  const coinNow = () => (typeof coinInfo !== 'undefined' && coinInfo && typeof coinInfo.coins === 'number' ? coinInfo.coins : null);
+  const coinText = () => (coinNow() === null ? '' : `간식 코인 ${coinNow()}`);
   let pendingUnlock = null;   // 게임 중에 새로 풀린 소품 → 광장에 돌아오면 말풍선으로 알려 줌
   function closeArcade() {
     if (!openGame) return;
     gameBox.classList.remove('open'); window.plazaPaused = false;
     if (typeof music !== 'undefined' && music.game) music.game(false);
     setFrame('about:blank');   // 게임 화면이 닫히면서 남은 점수를 보냄 (pagehide)
-    openGame = null; loadTotal(); setTimeout(loadRanks, 1500);   // 방금 낸 점수가 순위에 반영되게
+    openGame = null; loadTotal(); setTimeout(loadRanks, 1500); if (typeof loadCoins === 'function') setTimeout(loadCoins, 1500);   // 방금 낸 점수가 순위에 반영되게
     if (pendingUnlock) { speech.set(myId, { text: `${pendingUnlock.name} 풀렸다, 옷장 가 보자`, until: Date.now() + 3500 }); pendingUnlock = null; }
   }
   arcadeBtn.onclick = () => {
@@ -243,14 +246,20 @@
     if (d && d.type === 'doduk-kibble') {   // 간식 한 알 모음 → 전광판 막대 바로 올리기
       myKibbles++;
       if (prog) { prog = { ...prog, total: prog.total + 1, current: prog.current + 1, today: prog.today + 1, [d.team === 'cat' ? 'today_cat' : 'today_dog']: (prog[d.team === 'cat' ? 'today_cat' : 'today_dog'] || 0) + 1 }; }
-      document.getElementById('gameGive').textContent = `간식 +${myKibbles}알`;
+      if (typeof setCoins === 'function') setCoins(d.coins);
+      document.getElementById('gameGive').textContent = coinNow() === null ? `간식 +${myKibbles}알` : `간식 +${myKibbles}알 · 코인 ${coinNow()}`;
       setTimeout(loadTotal, 1500);
+      return;
+    }
+    if (d && d.type === 'doduk-coins') {   // 코인이 없어서 알을 못 받음 등 → 남은 코인만 고침
+      if (typeof setCoins === 'function') setCoins(d.coins);
+      document.getElementById('gameGive').textContent = myKibbles && coinNow() !== null ? `간식 +${myKibbles}알 · 코인 ${coinNow()}` : coinText();
       return;
     }
     if (!d || d.type !== 'doduk-score' || !(d.score > 0)) return;
     given += d.score;
     if (everyone) { everyone = { ...everyone, total: Number(everyone.total) + d.score, today: Number(everyone.today) + d.score }; }
-    if (!myKibbles) document.getElementById('gameGive').textContent = `+${given.toLocaleString('ko-KR')}점`;
+    if (!myKibbles && coinNow() === null) document.getElementById('gameGive').textContent = `+${given.toLocaleString('ko-KR')}점`;
     setTimeout(loadTotal, 1500);
   });
 
