@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>도둑냥 오락실</title>
 <meta property="og:title" content="도둑냥 오락실">
-<meta property="og:description" content="게임 한 판 하면 간식 한 알, 300알 모이면 간식을 보호소로">
+<meta property="og:description" content="게임 한 판 하면 간식 한 알, 300알 모이면 간식 1팩을 보호소로">
 <meta property="og:image" content="https://opstin-rock.github.io/doduk-images/warehouse/img/og.png">
 <meta property="og:type" content="website">
 
-<meta name="description" content="강아지·고양이로 들어와서 게임 한 판에 간식 한 알씩, 300알 모이면 보호소로 보내는 도둑냥 오락실">
+<meta name="description" content="강아지·고양이로 들어와서 게임 한 판에 간식 한 알씩, 300알 모이면 간식 1팩을 보호소로 보내는 도둑냥 오락실">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700;900&display=swap">
 <style>
   :root { --ink:#1f1f22; --cream:#fbf6ec; --yellow:#ffd54a; --red:#e8402f; --gray:#8a8a8a; }
@@ -97,6 +97,12 @@
   .chooser button.any { background:#f1f1f1; font-size:16px; }
   .top .lefts { display:flex; gap:6px; pointer-events:auto; }
   .chip.ward { cursor:pointer; background:var(--yellow); }
+  .chip.coin { position:fixed; left:max(12px, calc(50vw - 248px)); top:50px; cursor:pointer; background:#2B2622; color:#FFD54A; font-family:"Jua",sans-serif; font-weight:400; font-size:14px; padding:5px 11px; }
+  .chip.coin b { color:#fff; margin-left:3px; }
+  .coinbig { font-family:"Jua",sans-serif; font-size:44px; color:var(--ink); margin:2px 0; }
+  .coinbig small { font-size:18px; color:var(--gray); margin-left:4px; }
+  .coinrules { text-align:left; font-size:13px; line-height:1.6; background:var(--cream); border-radius:12px; padding:10px 12px; margin:8px 0 4px; word-break:keep-all; }
+  .coinrules div::before { content:"·"; margin-right:6px; color:var(--red); font-weight:900; }
   .chooser .box.pick { width:min(100%, 380px); max-height:calc(100vh - 24px); max-height:calc(var(--vh, 100vh) - 24px); overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; padding:16px 14px 0; }
   .pick .tabs { display:flex; gap:6px; margin:10px 0 8px; }
   .pick .tabs button { margin:0; padding:9px; font-size:16px; background:#f1f1f1; }
@@ -167,6 +173,7 @@
   <div class="chip" id="count">지금 <b>1</b>마리 구경 중</div>
 </div>
 <button class="chip music" id="music">음악 끄기</button>
+<div class="chip coin" id="coinBtn">코인<b>-</b></div>
 <div class="snackbar" id="snackBar"></div>
 <div class="chooser" id="chooser">
   <div class="box pick">
@@ -196,6 +203,16 @@
     <div class="tabs" id="rankTabs"><button data-game="sacheon" class="on">사천성</button><button data-game="peaks">트라이피크</button><button data-game="dodge">똥피하기</button></div>
     <div id="rankList"></div>
     <div class="row2"><button id="rankClose" class="go">닫기</button></div>
+  </div>
+</div>
+<div class="chooser" id="coinBox">
+  <div class="box">
+    <div class="ct">오늘 코인</div>
+    <div class="coinbig" id="coinBig">-</div>
+    <div class="coinrules" id="coinRules"></div>
+    <button id="coinAd" style="display:none">광고 보고 코인 +1</button>
+    <div class="cs" id="coinMsg"></div>
+    <button id="coinClose" class="any">닫기</button>
   </div>
 </div>
 <div class="hint" id="hint">바닥을 누르면 걸어가 · 게임기 앞에 서면 게임</div>
@@ -269,8 +286,8 @@
 <script src="config.js?v=26"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="pets.js?v=39"></script>
-<script src="lab/score.js?v=8"></script>
-<script src="app.js?v=43"></script>
-<script src="extras.js?v=45"></script>
+<script src="lab/score.js?v=9"></script>
+<script src="app.js?v=44"></script>
+<script src="extras.js?v=46"></script>
 </body>
 </html>
