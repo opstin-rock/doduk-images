@@ -467,7 +467,7 @@ function showCoins() {
     '코인이 없어도 게임은 계속 돼. 간식 알만 안 쌓여',
     `매일 0시에 무료 코인 ${free}개로 다시 채워져`,
     coinInfo.bonus > 0 ? `덤 코인 ${coinInfo.bonus}개는 날이 바뀌어도 남아` : '',
-    '300알 모이면 간식 1팩, 매월 초 한 박스로 보호소에 보내',
+    '300알 차면 1팩 보관, 매월 초 한 박스로 보호소에 보내',
   ].filter(Boolean).map((t) => `<div>${t}</div>`).join('');
   const ad = document.getElementById('coinAd');
   const adReady = coinInfo.ads_on && typeof window.showRewardedAd === 'function';   // 광고는 승인 뒤에 붙임
@@ -734,7 +734,7 @@ function drawBooth(t) {
   rr(c.x - 80, c.y - 28, 160, 52, 10); ctx.fillStyle = '#6B4A30'; ctx.fill();
   rr(c.x - 80, c.y - 28, 160, 14, 10); ctx.fillStyle = '#8A6343'; ctx.fill();
   if (!bot.home || (bot.say && Date.now() < bot.say.until)) return;   // 도둑냥이 청소하러 나가면 부스는 비어 있음
-  const lines = ['어서 와, 여긴 도둑냥 오락실이야', '게임기 앞에 서면 바로 할 수 있어', '코인은 매일 3개, 한 판 끝내면 코인 1개로 간식 한 알', '300알 모이면 간식 1팩, 매월 초 보호소로', '매시 정각엔 간식 타임, 1분 동안 많이 주워', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 빗자루가 치워', '물음표 게임기는 곧 열려'];
+  const lines = ['어서 와, 여긴 도둑냥 오락실이야', '게임기 앞에 서면 바로 할 수 있어', '코인은 매일 3개, 한 판 끝내면 코인 1개로 간식 한 알', '300알 차면 1팩 보관, 매월 초 보호소로', '매시 정각엔 간식 타임, 1분 동안 많이 주워', '행동 버튼 눌러봐, 똥도 쌀 수 있어', '똥 싸면 빗자루가 치워', '물음표 게임기는 곧 열려'];
   const msg = lines[Math.floor(t / 4) % lines.length];
   ctx.font = '18px Jua'; const w = ctx.measureText(msg).width + 24;
   const bx = c.x + 30, by = c.y - 172;
