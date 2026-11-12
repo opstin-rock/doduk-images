@@ -108,7 +108,7 @@
 <div class="modal open" id="startBox"><div class="box rules">
   <a class="back" href="arcade.html?v=1">← 오락실</a>
   <h2>트라이피크 하는 법</h2>
-  <p class="muted">한 판(카드 한 벌) 끝내면 보호소에 보낼 <b>간식 한 알</b> (카드 10장 이상, 하루 20알까지). 300알 모이면 간식 1개를 보내</p>
+  <p class="muted">한 판(카드 한 벌) 끝내면 보호소에 보낼 <b>간식 한 알</b> (카드 10장 이상, 코인 1개). 코인은 매일 3개, 300알 모이면 간식 1팩을 보호소로</p>
   <ol>
     <li><b>목표</b>: 위에 쌓인 봉우리 카드 28장을 전부 가져오기</li>
     <li><b>가져오는 법</b>: 아래 <span class="hl">펼친 카드</span>보다 숫자가 <b>딱 1 크거나 1 작은</b> 카드를 눌러</li>
@@ -169,7 +169,7 @@
 <script src="haptic.js?v=1"></script>
 <script src="sfx.js?v=1"></script>
 <script src="../config.js?v=26"></script>
-<script src="score.js?v=8"></script>
+<script src="score.js?v=9"></script>
 <script>if (location.search.includes('embed')) document.documentElement.classList.add('embed');</script>
 <script>
 (() => {
@@ -351,7 +351,7 @@
   let dealTaken = 0, kibbleDone = false;
   function giveKibble() { if (kibbleDone) return Promise.resolve(undefined); kibbleDone = true; Score.gameDone(); return Score.kibble('peaks'); }
   function kibbleIfPlayed() { return running && dealTaken >= 10 ? giveKibble() : Promise.resolve(undefined); }
-  const kibbleText = (r) => r === undefined ? '카드 10장 이상 가져오면 한 알' : r && r.ok ? `+1 (오늘 ${r.today}/20)` : r && r.reason === 'cap' ? '오늘 20알 다 모았어' : r && (r.reason === 'ipcap' || r.reason === 'daycap') ? '오늘은 여기까지 받을 수 있어' : '나중에 다시 보낼게';
+  const kibbleText = (r) => Score.kibbleMsg(r, '카드 10장 이상 가져오면 한 알');
   function showKibble(id, promise) { promise.then((r) => { const el = document.getElementById(id); if (el) el.textContent = kibbleText(r); if (r && r.ok) Sfx.kibble(); }); }
   // 모두의 점수: 아직 안 보낸 만큼만 보냄 (판 성공, 끝, 처음부터, 창 닫기 때)
   let sent = 0, bestP = Promise.resolve();
